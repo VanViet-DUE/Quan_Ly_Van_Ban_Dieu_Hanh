@@ -1,0 +1,202 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}He thong quan ly van ban dieu hanh{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="page-shell">
+        <header>
+            <div class="Thongtin">
+                <img src="{% static 'picture/logo.png' %}" alt="logo" style="width: 50px;">
+                <div class="Thongtin-text">
+                    <p id="tentruong">TRƯỜNG THPT NGUYỄN DỤC</p>
+                    <p id="tenhethong">HỆ THỐNG QUẢN LÝ VĂN BẢN ĐIỀU HÀNH</p>
+                </div>
+            </div>
+
+            <div class="Name">
+                <div class="Name-text">
+                    <p id="name">{{ display_ho_ten|default:request.user.username|upper }}</p>
+                    <p id="chucvu">{{ display_chuc_vu|default:"NGUOI DUNG HE THONG"|upper }}</p>
+                </div>
+                <i class="bi bi-person-circle" style="color: rgb(255, 255, 255);"></i>
+            </div>
+        </header>
+
+        <div class="taskbar-top">
+            {% if ui_permissions.can_follow_condition %}
+                <a class="combo-button{% if active_menu == 'follow_condition' %} active{% endif %}" href="{% url 'theo_doi_tinh_trang' %}">
+                    <i class="bi bi-clipboard2-check"></i>
+                    <label>Theo dõi tình trạng</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_view_incoming_outgoing %}
+                <a class="combo-button{% if active_menu == 'incoming_text' %} active{% endif %}" href="{% url 'danh_sach_van_ban_den' %}">
+                    <i class="bi bi-file-earmark-plus"></i>
+                    <label>văn bản đến</label>
+                </a>
+
+                <a class="combo-button{% if active_menu == 'outgoing_text' %} active{% endif %}" href="{% url 'danh_sach_van_ban_di' %}">
+                    <i class="bi bi-file-earmark-minus"></i>
+                    <label>Văn bản đi</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_create_document %}
+                <a class="combo-button{% if active_menu == 'create_text' %} active{% endif %}" href="{% url 'tao_van_ban' %}">
+                    <i class="bi bi-file-earmark-word"></i>
+                    <label>Tạo văn bản</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_manage_work %}
+                <a class="combo-button{% if active_menu == 'work_management' %} active{% endif %}" href="{% url 'duyet_van_ban' %}">
+                    <i class="bi bi-briefcase"></i>
+                    <label>Quản lý công việc</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_personal_work %}
+                <a class="combo-button{% if active_menu == 'personal_work' %} active{% endif %}" href="{% url 'van_ban_xu_ly_ca_nhan' %}">
+                    <i class="bi bi-person-workspace"></i>
+                    <label>Công việc cá nhân</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_document_list %}
+                <a class="combo-button{% if active_menu == 'document_list' %} active{% endif %}" href="{% url 'van_ban_da_ban_hanh' %}">
+                    <i class="bi bi-layout-text-sidebar-reverse"></i>
+                    <label>Danh sách văn bản</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_template_text %}
+                <a class="combo-button{% if active_menu == 'template_text' %} active{% endif %}" href="{% url 'danh_sach_mau_van_ban' %}">
+                    <i class="bi bi-menu-button-wide-fill"></i>
+                    <label>Mẫu văn bản</label>
+                </a>
+            {% endif %}
+
+            {% if ui_permissions.can_manage_accounts %}
+                <a class="combo-button{% if active_menu == 'account_management' %} active{% endif %}" href="{% url 'danh_sach_nguoi_dung' %}">
+                    <i class="bi bi-people-fill"></i>
+                    <label>Quản lý tài khoản</label>
+                </a>
+            {% endif %}
+            {% if ui_permissions.can_manage_recipients %}
+                <a class="combo-button{% if active_menu == 'recipient_management' %} active{% endif %}" href="{% url 'danh_sach_noi_nhan' %}">
+                    <i class="bi bi-geo-alt-fill"></i>
+                    <label>Quan ly noi nhan</label>
+                </a>
+            {% endif %}
+        </div>
+
+        <div class="container">
+            <div class="danhmuc">
+                <div id="tieudedanhmuc">
+                    <i class="bi bi-list-ul"></i>
+                    <label>Danh mục</label>
+                </div>
+
+                {% block sidebar %}{% endblock %}
+
+                <a class="combo-button" id="logout" href="{% url 'logout' %}">
+                    <i class="bi bi-box-arrow-left"></i>
+                    <label>Đăng xuất</label>
+                </a>
+            </div>
+
+            <div class="main-body">
+                {% if messages %}
+                    <div class="page-messages">
+                        {% for message in messages %}
+                            <div class="page-message {{ message.tags }}">{{ message }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+
+        <footer class="page-footer">@Thuc hien boi nhom 3</footer>
+    </div>
+
+    <script>
+        (function () {
+            const normalizeStatus = (value) =>
+                (value || "")
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase()
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+            const getStatusTheme = (status) => {
+                const normalized = normalizeStatus(status);
+                if (!normalized) return "";
+                if (normalized.includes("ban hanh")) return "status-theme-published";
+                if (normalized.includes("hoan thanh") || normalized.includes("da duyet") || normalized.includes("da chinh sua")) {
+                    return "status-theme-done";
+                }
+                if (normalized.includes("dang chinh sua") || normalized.includes("cho chinh sua")) return "status-theme-edit";
+                if (normalized.includes("cho duyet") || normalized.includes("uy quyen")) return "status-theme-review";
+                if (normalized.includes("dang xu ly") || normalized.includes("cho luan chuyen")) return "status-theme-progress";
+                if (
+                    normalized.includes("cho phan cong") ||
+                    normalized.includes("cho xu ly") ||
+                    normalized.includes("du thao") ||
+                    normalized.includes("cho dang ky") ||
+                    normalized.includes("chua phan cong")
+                ) {
+                    return "status-theme-pending";
+                }
+                return "";
+            };
+
+            const applyStatusThemes = () => {
+                const selectors = [
+                    ".status-badge",
+                    '[data-col="trang-thai"]',
+                    'td.status-pending',
+                    'td.status-processing',
+                    'td.status-done'
+                ];
+                document.querySelectorAll(selectors.join(",")).forEach((element) => {
+                    const statusText = element.dataset.trangThai || element.textContent;
+                    const themeClass = getStatusTheme(statusText);
+                    const target = element.classList.contains("status-badge")
+                        ? element
+                        : element.querySelector(".status-badge") || element;
+                    target.classList.remove(
+                        "status-theme-pending",
+                        "status-theme-progress",
+                        "status-theme-review",
+                        "status-theme-edit",
+                        "status-theme-done",
+                        "status-theme-published"
+                    );
+                    if (themeClass) {
+                        target.classList.add(themeClass);
+                    }
+                });
+            };
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", applyStatusThemes);
+            } else {
+                applyStatusThemes();
+            }
+            window.applyStatusThemes = applyStatusThemes;
+        })();
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

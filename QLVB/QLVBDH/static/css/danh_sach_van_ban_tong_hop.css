@@ -1,0 +1,14 @@
+@import url("duyet_van_ban.css");
+
+#vanbandabanhanh,
+#vanbandatao {
+    border-radius: 0;
+    padding: 10px;
+}
+
+#vanbandabanhanh:hover,
+#vanbandatao:hover,
+#vanbandabanhanh.active,
+#vanbandatao.active {
+    border-radius: 0;
+}
