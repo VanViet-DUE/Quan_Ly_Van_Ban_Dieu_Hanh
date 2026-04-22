@@ -17,6 +17,10 @@
     const fileLink = document.getElementById("m-file-link");
     const fileUploadInput = document.getElementById("m-file-upload");
     const fileUploadTrigger = document.getElementById("m-file-upload-trigger");
+    const attachmentList = document.getElementById("m-attachment-list");
+    const attachmentUploadInput = document.getElementById("m-attachment-upload");
+    const attachmentUploadTrigger = document.getElementById("m-attachment-upload-trigger");
+    const attachmentDeleteIdsInput = document.getElementById("m-attachment-delete-ids");
     const searchInput = document.getElementById("search-input");
     const searchButton = document.getElementById("search-button");
 
@@ -27,6 +31,8 @@
     const canManageDocuments = !page || page.dataset.canManage === "1";
 
     let activeRow = null;
+    let deletedAttachmentIds = new Set();
+    let currentAttachments = [];
 
     const fieldMap = {
         "m-so-den": "soDen",
@@ -80,12 +86,67 @@
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
 
+    function parseAttachments(jsonValue) {
+        if (!jsonValue) {
+            return [];
+        }
+        try {
+            return JSON.parse(jsonValue);
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function renderAttachmentList(items, editable) {
+        if (!attachmentList) {
+            return;
+        }
+        attachmentList.innerHTML = "";
+        if (!items.length) {
+            attachmentList.innerHTML = '<div class="attachment-empty">Khong co tep dinh kem.</div>';
+            return;
+        }
+        items.forEach(function (item) {
+            const row = document.createElement("div");
+            const link = document.createElement("a");
+            row.className = "attachment-item";
+            const actions = document.createElement("div");
+            link.className = "attachment-link";
+            link.href = item.url || "#";
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = item.name || "Tep dinh kem";
+            if (!item.url) {
+                link.classList.add("disabled");
+            }
+            actions.className = "attachment-actions";
+            row.appendChild(link);
+            if (editable && item.id) {
+                const deleteButton = document.createElement("button");
+                deleteButton.type = "button";
+                deleteButton.className = "attachment-delete-btn";
+                deleteButton.dataset.attachmentId = item.id;
+                deleteButton.textContent = "Xóa";
+                actions.appendChild(deleteButton);
+            }
+            if (actions.childNodes.length) {
+                row.appendChild(actions);
+            }
+            attachmentList.appendChild(row);
+        });
+    }
+
     function setEditMode(enabled) {
-        const allowEdit = canManageDocuments && activeRow ? canEditStatus(activeRow.dataset.trangThai) : false;
-        const editable = enabled && allowEdit;
+        const allowFullEdit = canManageDocuments && activeRow ? canEditStatus(activeRow.dataset.trangThai) : false;
+        const allowAttachmentEdit = canManageDocuments && Boolean(activeRow);
+        const editable = enabled && allowFullEdit;
+        const attachmentEditable = enabled && allowAttachmentEdit;
         const editableInputs = editForm.querySelectorAll("input[name], textarea[name], select[name]");
         editableInputs.forEach((field) => {
             if (field.id === "m-so-den") {
+                return;
+            }
+            if (field.id === "m-attachment-upload" || field.id === "m-attachment-delete-ids") {
                 return;
             }
 
@@ -116,10 +177,14 @@
         });
 
         fileUploadTrigger.disabled = !editable;
+        if (attachmentUploadTrigger) {
+            attachmentUploadTrigger.disabled = !attachmentEditable;
+        }
         if (editButton) {
-            editButton.classList.toggle("hidden", editable || !allowEdit);
+            editButton.classList.toggle("hidden", enabled || !canManageDocuments);
         }
         editActions.classList.toggle("hidden", !editable);
+        renderAttachmentList(currentAttachments, attachmentEditable);
         updateActionButtons(
             activeRow ? activeRow.dataset.trangThai : "",
             editable,
@@ -147,7 +212,13 @@
             mucDoId: row.dataset.mucDoId,
             fileName: row.dataset.fileName,
             fileUrl: row.dataset.fileUrl,
+            attachments: parseAttachments(row.dataset.attachmentsJson),
         };
+        currentAttachments = data.attachments.slice();
+        deletedAttachmentIds = new Set();
+        if (attachmentDeleteIdsInput) {
+            attachmentDeleteIdsInput.value = "";
+        }
 
         Object.entries(fieldMap).forEach(([elementId, key]) => {
             const field = document.getElementById(elementId);
@@ -165,7 +236,11 @@
             fileLink.href = "#";
             fileLink.classList.add("disabled");
         }
+        renderAttachmentList(currentAttachments, false);
         fileUploadInput.value = "";
+        if (attachmentUploadInput) {
+            attachmentUploadInput.value = "";
+        }
         updateActionButtons(data.trangThai, false, data.daBanHanhNoiBo);
         errorBox.textContent = "";
     }
@@ -225,10 +300,9 @@
         activeRow.dataset.mucDo = documentData.muc_do;
         activeRow.dataset.mucDoId = document.getElementById("m-muc-do").value;
         activeRow.dataset.fileName = documentData.file_name;
+        activeRow.dataset.attachmentsJson = documentData.attachments_json || "[]";
         activeRow.dataset.daBanHanhNoiBo = documentData.da_ban_hanh_noi_bo ? "1" : "0";
-        if (documentData.file_url) {
-            activeRow.dataset.fileUrl = documentData.file_url;
-        }
+        activeRow.dataset.fileUrl = documentData.file_url || "";
         updateActionButtons(documentData.trang_thai_vb_den, false, Boolean(documentData.da_ban_hanh_noi_bo));
 
         activeRow.querySelector('[data-col="ngay-nhan"]').textContent = documentData.ngay_nhan;
@@ -238,7 +312,7 @@
         activeRow.querySelector('[data-col="co-quan"]').textContent = documentData.co_quan_ban_hanh;
 
         const statusCell = activeRow.querySelector('[data-col="trang-thai"]');
-        statusCell.textContent = documentData.trang_thai_vb_den;
+        statusCell.textContent = documentData.trang_thai_hien_thi || documentData.trang_thai_vb_den;
         statusCell.classList.remove("status-pending", "status-processing", "status-done");
         statusCell.classList.add(documentData.status_class);
         if (window.applyStatusThemes) {
@@ -290,6 +364,35 @@
         }
     });
 
+    if (attachmentUploadTrigger) {
+        attachmentUploadTrigger.addEventListener("click", function () {
+            if (!attachmentUploadTrigger.disabled && attachmentUploadInput) {
+                attachmentUploadInput.click();
+            }
+        });
+    }
+
+    if (attachmentList) {
+        attachmentList.addEventListener("click", function (event) {
+            const deleteButton = event.target.closest(".attachment-delete-btn");
+            if (!deleteButton || !activeRow) {
+                return;
+            }
+            const attachmentId = deleteButton.dataset.attachmentId;
+            if (!attachmentId) {
+                return;
+            }
+            deletedAttachmentIds.add(attachmentId);
+            if (attachmentDeleteIdsInput) {
+                attachmentDeleteIdsInput.value = Array.from(deletedAttachmentIds).join(",");
+            }
+            currentAttachments = currentAttachments.filter(function (item) {
+                return item.id !== attachmentId;
+            });
+            renderAttachmentList(currentAttachments, true);
+        });
+    }
+
     function submitPublishToggle() {
         const csrfToken = editForm.querySelector("[name=csrfmiddlewaretoken]").value;
         fetch(publishUrlInput.value, {
@@ -337,6 +440,9 @@
 
         const csrfToken = editForm.querySelector("[name=csrfmiddlewaretoken]").value;
         const formData = new FormData(editForm);
+        if (attachmentDeleteIdsInput) {
+            formData.set("tep_dinh_kem_xoa_ids", attachmentDeleteIdsInput.value || "");
+        }
 
         fetch(updateUrlInput.value, {
             method: "POST",

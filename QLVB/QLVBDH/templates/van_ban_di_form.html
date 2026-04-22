@@ -15,7 +15,7 @@
         <label>Đăng ký văn bản đi</label>
     </a>
     <a class="combo-button" id="phbng" href="{% url 'van_ban_phat_hanh_ben_ngoai' %}">
-        <label>Phat hanh ben ngoai</label>
+        <label>Phat hành bên ngoài</label>
     </a>
 {% endblock %}
 
@@ -32,7 +32,7 @@
                     </div>
                 </div>
                 <div class="form-group inline">
-                    <label for="display_trang_thai">Trạng thái:</label>
+                    <label for="display_trang_thai">Tranng thái:</label>
                     <div class="field-control">
                         <input id="display_trang_thai" type="text" value="{{ document.trang_thai_vb_di }}" readonly class="form-control bg-gray">
                     </div>
@@ -48,7 +48,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="display_ngay_ky">Ngày ký văn bản:</label>
+                    <label for="{{ form.ngay_ky.id_for_label }}">Ngày ký văn bản:</label>
                     <div class="field-control">
                         {{ form.ngay_ky }}
                         {{ form.ngay_ky.errors }}
@@ -100,7 +100,7 @@
                 </div>
 
                 <div class="form-group form-group-full">
-                    <label for="display_noi_nhan">Nơi nhận:</label>
+                    <label for="display_noi_nhan">Nơi ký:</label>
                     <div class="field-control">
                         {{ form.noi_nhan }}
                         {{ form.noi_nhan.errors }}
@@ -108,7 +108,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="{{ form.so_ky_hieu.id_for_label }}">So ky hieu van ban:</label>
+                    <label for="{{ form.so_ky_hieu.id_for_label }}">Số ký hiệu văn bản:</label>
                     <div class="field-control cap-so-field">
                         {{ form.so_ky_hieu }}
                         <button type="button" class="btn-main btn-cap-so{% if not can_register or is_new_registration %} hidden{% endif %}" id="btn-cap-so">Cap so</button>
@@ -126,16 +126,34 @@
 
                 {% if show_draft_file %}
                     <div class="form-group form-group-full">
-                        <label for="draft_file_name">File dự thảo:</label>
+                        <label>File dự thảo hiện có:</label>
                         <div class="field-control">
-                            <div class="file-input-wrapper">
-                                <a class="file-display-link{% if not document.ban_du_thao %} disabled{% endif %}" href="{% if document.ban_du_thao %}{{ document.ban_du_thao.url }}{% else %}#{% endif %}" target="_blank" rel="noopener noreferrer">
-                                    <input id="draft_file_name" type="text" value="{% if document.ban_du_thao %}{{ document.ban_du_thao.name|cut:'van_ban_di/du_thao/' }}{% endif %}" readonly class="form-control bg-gray">
-                                </a>
-                                <button type="button" class="btn-icon" disabled aria-label="Mo file du thao">
-                                    <i class="bi bi-file-earmark-break"></i>
-                                </button>
-                            </div>
+                            {% with draft_attachments=document.get_draft_attachments %}
+                                {% if draft_attachments %}
+                                    <div class="file-input-wrapper">
+                                        <a class="file-display-link" href="{{ draft_attachments.0.tep_tin.url }}" target="_blank" rel="noopener noreferrer">
+                                            <input id="draft_file_name" type="text" value="{{ draft_attachments.0.tep_tin.name|cut:'van_ban_di/du_thao/' }}" readonly class="form-control bg-gray">
+                                        </a>
+                                        <button type="button" class="btn-icon" disabled aria-label="Mở file dự thảo">
+                                            <i class="bi bi-file-earmark-break"></i>
+                                        </button>
+                                    </div>
+                                    <div class="existing-attachments">
+                                        {% for attachment in draft_attachments %}
+                                            <a href="{{ attachment.tep_tin.url }}" target="_blank" rel="noopener noreferrer">{{ attachment.tep_tin.name|cut:'van_ban_di/du_thao/' }}</a>
+                                        {% endfor %}
+                                    </div>
+                                {% elif document.ban_du_thao %}
+                                    <div class="file-input-wrapper">
+                                        <a class="file-display-link" href="{{ document.ban_du_thao.url }}" target="_blank" rel="noopener noreferrer">
+                                            <input id="draft_file_name" type="text" value="{{ document.ban_du_thao.name|cut:'van_ban_di/du_thao/' }}" readonly class="form-control bg-gray">
+                                        </a>
+                                        <button type="button" class="btn-icon" disabled aria-label="Mở file dự thảo">
+                                            <i class="bi bi-file-earmark-break"></i>
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
                         </div>
                     </div>
                 {% endif %}
@@ -144,13 +162,44 @@
                     <label for="{{ form.ban_chinh_thuc.id_for_label }}">File chính thức:</label>
                     <div class="field-control">
                         {{ form.ban_chinh_thuc }}
-                        <div class="file-input-wrapper{% if not can_register %} disabled-wrapper{% endif %}" data-file-trigger>
-                            <input type="text" value="{% if document.ban_chinh_thuc %}{{ document.ban_chinh_thuc.name|cut:'van_ban_di/chinh_thuc/' }}{% else %}Nhấn vào biểu tượng để tải tệp lên{% endif %}" readonly class="form-control bg-gray" id="selected-file-name">
+                        <div class="file-input-wrapper{% if not can_register %} disabled-wrapper{% endif %}" data-primary-file-trigger>
+                            <input type="text" value="{% if document.ban_chinh_thuc %}{{ document.ban_chinh_thuc.name|cut:'van_ban_di/chinh_thuc/' }}{% else %}Nhan vao bieu tuong de tai 1 tep chinh thuc{% endif %}" readonly class="form-control bg-gray" id="selected-file-name">
                             <button type="button" class="btn-icon" id="trigger-file-button" aria-label="Tai tep" {% if not can_register %}disabled{% endif %}>
                                 <i class="bi bi-file-earmark-break"></i>
                             </button>
                         </div>
                         {{ form.ban_chinh_thuc.errors }}
+                    </div>
+                </div>
+
+                <div class="form-group form-group-full">
+                    <label for="{{ form.tep_dinh_kem_uploads.id_for_label }}">Tệp đính kèm:</label>
+                    <div class="field-control">
+                        {{ form.tep_dinh_kem_uploads }}
+                        <button
+                            type="button"
+                            class="btn-main btn-secondary btn-attachment-trigger"
+                            id="trigger-attachment-button"
+                            {% if not can_register %}disabled{% endif %}
+                        >
+                            Thêm tệp đính kèm
+                        </button>
+                        {{ form.tep_dinh_kem_uploads.errors }}
+                        {% if document.pk %}
+                            {% with official_attachments=document.get_official_attachments %}
+                                {% if official_attachments|length > 1 %}
+                                    <div class="existing-attachments">
+                                        {% for attachment in official_attachments|slice:"1:" %}
+                                            <a href="{{ attachment.tep_tin.url }}" target="_blank" rel="noopener noreferrer">{{ attachment.tep_tin.name|cut:'van_ban_di/chinh_thuc/' }}</a>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+                        <div class="attachment-list hidden" id="attachment-list-wrapper">
+                            <div class="attachment-list-title">Danh saách tệp đính kèm</div>
+                            <div id="attachment-list"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -160,7 +209,10 @@
             {% endif %}
 
             <div class="form-actions">
-                <a href="{% url 'danh_sach_van_ban_di' %}" class="btn-main btn-cancel">Quay lại</a>
+                {% if can_register %}
+                <button type="reset" class="btn-main btn-cancel">Hủy</button>
+                <button type="submit" class="btn-main">Lưu</button>
+                {% endif %}
                 {% if can_external_publish %}
                     <button
                         type="button"
@@ -168,7 +220,7 @@
                         id="btn-phat-hanh-ben-ngoai"
                         data-publish-url="{% url 'phat_hanh_ben_ngoai_van_ban_di' document.so_vb_di %}"
                     >
-                        Phat hanh ben ngoai
+                        Phát hành beên ngoài
                     </button>
                 {% endif %}
                 {% if can_internal_publish %}
@@ -178,7 +230,7 @@
                         id="btn-ban-hanh-noi-bo"
                         data-publish-url="{% url 'ban_hanh_noi_bo_van_ban_di' document.so_vb_di %}"
                     >
-                        {% if document.da_ban_hanh_noi_bo %}Ngung ban hanh{% else %}Ban hanh noi bo{% endif %}
+                        {% if document.da_ban_hanh_noi_bo %}Ngưng ban hành{% else %}Ban hành nội bộ{% endif %}
                     </button>
                 {% endif %}
                 {% if can_send_assignment %}
@@ -197,24 +249,18 @@
         <div class="preview-container">
             <div class="preview-header">
                 <h3>Xem trước văn bản</h3>
-                <p>
-                    {% if show_draft_file %}
-                        Mo tep du thao hoac tep chinh thuc de kiem tra noi dung.
-                    {% else %}
-                        Tai tep chinh thuc de kiem tra noi dung.
-                    {% endif %}
-                </p>
+                <p>Khung xem trước chỉ hiển thị file chính thức.</p>
             </div>
             <div class="preview-box" id="preview-box">
                 <div class="preview-placeholder" id="preview-placeholder">
                     {% if show_draft_file %}
-                        Chua co tep moi duoc chon. File du thao hien co co the mo bang lien ket ben trai.
+                        Chưa có tệp được chọn.
                     {% else %}
-                        Chua co tep chinh thuc nao duoc chon.
+                        Chưa có tệp chính thức nào được chọn.
                     {% endif %}
                 </div>
-                <img src="" alt="Xem truoc anh scan" id="preview-image" class="preview-element hidden">
-                <iframe id="preview-pdf" class="preview-element hidden" title="Xem truoc PDF"></iframe>
+                <img src="" alt="Xem trước ảnh scan" id="preview-image" class="preview-element hidden">
+                <iframe id="preview-pdf" class="preview-element hidden" title="Xem trước PDF"></iframe>
                 <div id="preview-word" class="preview-element preview-word hidden"></div>
                 <div id="preview-message" class="preview-element preview-message hidden"></div>
             </div>
@@ -228,6 +274,14 @@
                 <button class="modal-close" type="button" id="close-recipient-modal">&#x2715;</button>
             </div>
             <div class="modal-body">
+                <div class="modal-form-group">
+                    <label for="dispatch-operator-name">Nguoi thuc hien:</label>
+                    <input type="text" id="dispatch-operator-name" class="modal-input bg-gray" value="{{ display_ho_ten }}" readonly>
+                </div>
+                <div class="modal-form-group">
+                    <label for="dispatch-note">Ghi chu:</label>
+                    <textarea id="dispatch-note" class="modal-input" rows="3" placeholder="Nhap ghi chu phat hanh ben ngoai"></textarea>
+                </div>
                 <div class="search-input-wrapper recipient-search">
                     <i class="bi bi-search search-icon"></i>
                     <input type="text" id="recipient-search-input" placeholder="Tim theo ten noi nhan, dia chi, SDT, gmail...">
@@ -242,13 +296,13 @@
                             </span>
                         </label>
                     {% empty %}
-                        <div class="empty-state">Chưa có nơi nhận nào.</div>
+                        <div class="empty-state">Chua co noi nhan nao.</div>
                     {% endfor %}
                 </div>
                 <div class="form-errors" id="recipient-form-errors"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn-modal btn-luu" type="button" id="btn-submit-recipient-selection">Xác nhận</button>
+                <button class="btn-modal btn-luu" type="button" id="btn-submit-recipient-selection">Xac nhan</button>
             </div>
         </div>
     </div>

@@ -361,6 +361,64 @@
     margin-top: 8px;
 }
 
+.attachment-list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.attachment-item {
+    padding: 9px 12px;
+    border: 1px solid #d7dee7;
+    border-radius: 8px;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.attachment-link {
+    color: #1a4b7c;
+    text-decoration: none;
+    word-break: break-word;
+}
+
+.attachment-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.attachment-delete-btn {
+    border: 0;
+    background: #dc3545;
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.attachment-upload-row {
+    margin-top: 10px;
+}
+
+.attachment-upload-trigger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.attachment-link:hover {
+    text-decoration: underline;
+}
+
+.attachment-empty {
+    color: #64748b;
+    font-size: 14px;
+}
+
 .notification-overlay {
     position: fixed;
     inset: 0;

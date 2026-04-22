@@ -1,7 +1,11 @@
 (function () {
-    const fileInput = document.getElementById("id_ban_chinh_thuc");
+    const primaryInput = document.getElementById("id_ban_chinh_thuc");
+    const attachmentInput = document.getElementById("id_tep_dinh_kem");
     const fileNameInput = document.getElementById("selected-file-name");
-    const triggerAreas = document.querySelectorAll("[data-file-trigger], #trigger-file-button");
+    const primaryTriggerAreas = document.querySelectorAll("[data-primary-file-trigger], #trigger-file-button");
+    const attachmentTrigger = document.getElementById("trigger-attachment-button");
+    const attachmentListWrapper = document.getElementById("attachment-list-wrapper");
+    const attachmentList = document.getElementById("attachment-list");
     const placeholder = document.getElementById("preview-placeholder");
     const imagePreview = document.getElementById("preview-image");
     const pdfPreview = document.getElementById("preview-pdf");
@@ -20,14 +24,43 @@
     const recipientItems = document.querySelectorAll(".recipient-item");
     const submitRecipientSelectionButton = document.getElementById("btn-submit-recipient-selection");
     const recipientErrorBox = document.getElementById("recipient-form-errors");
+    const dispatchNote = document.getElementById("dispatch-note");
 
     let activeObjectUrl = null;
+    let attachmentUrls = [];
+    let attachmentStore = null;
+
+    try {
+        if (typeof DataTransfer !== "undefined") {
+            attachmentStore = new DataTransfer();
+        }
+    } catch (error) {
+        attachmentStore = null;
+    }
 
     function revokeObjectUrl() {
         if (activeObjectUrl) {
             URL.revokeObjectURL(activeObjectUrl);
             activeObjectUrl = null;
         }
+    }
+
+    function revokeAttachmentUrls() {
+        attachmentUrls.forEach(function (url) {
+            URL.revokeObjectURL(url);
+        });
+        attachmentUrls = [];
+    }
+
+    function syncAttachmentStore(files) {
+        if (!attachmentStore || !attachmentInput) {
+            return;
+        }
+        attachmentStore.items.clear();
+        files.forEach(function (file) {
+            attachmentStore.items.add(file);
+        });
+        attachmentInput.files = attachmentStore.files;
     }
 
     function hideAllPreviews() {
@@ -101,10 +134,11 @@
     }
 
     function handleFileChange() {
-        const file = fileInput && fileInput.files && fileInput.files[0];
+        const files = primaryInput && primaryInput.files ? Array.from(primaryInput.files) : [];
+        const file = files[0];
         if (!file) {
             if (fileNameInput && !fileNameInput.value) {
-                fileNameInput.value = "Nhan bieu tuong de tai tep chinh thuc";
+                fileNameInput.value = "Nhan bieu tuong de tai 1 tep chinh thuc";
             }
             showPlaceholder();
             return;
@@ -139,17 +173,84 @@
         showMessage("Dinh dang tep nay chua duoc ho tro xem truoc.");
     }
 
-    triggerAreas.forEach(function (element) {
+    function renderAttachmentList() {
+        if (!attachmentList || !attachmentInput) {
+            return;
+        }
+
+        revokeAttachmentUrls();
+        attachmentList.innerHTML = "";
+        const files = Array.from(attachmentInput.files || []);
+        attachmentListWrapper?.classList.toggle("hidden", files.length === 0);
+
+        files.forEach(function (file, index) {
+            const item = document.createElement("div");
+            const link = document.createElement("a");
+            const deleteButton = document.createElement("button");
+            const objectUrl = URL.createObjectURL(file);
+
+            attachmentUrls.push(objectUrl);
+            item.className = "attachment-item";
+            link.className = "attachment-link";
+            link.href = objectUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = file.name;
+
+            deleteButton.type = "button";
+            deleteButton.className = "attachment-delete";
+            deleteButton.textContent = "Xoa";
+            deleteButton.disabled = Boolean(attachmentTrigger && attachmentTrigger.disabled);
+            deleteButton.addEventListener("click", function () {
+                const remainingFiles = Array.from(attachmentInput.files || []).filter(function (_, currentIndex) {
+                    return currentIndex !== index;
+                });
+                syncAttachmentStore(remainingFiles);
+                renderAttachmentList();
+            });
+
+            item.appendChild(link);
+            item.appendChild(deleteButton);
+            attachmentList.appendChild(item);
+        });
+    }
+
+    function appendAttachments() {
+        if (!attachmentInput || !attachmentInput.files) {
+            return;
+        }
+
+        if (!attachmentStore) {
+            renderAttachmentList();
+            return;
+        }
+
+        Array.from(attachmentInput.files).forEach(function (file) {
+            attachmentStore.items.add(file);
+        });
+        attachmentInput.files = attachmentStore.files;
+        renderAttachmentList();
+    }
+
+    primaryTriggerAreas.forEach(function (element) {
         element.addEventListener("click", function () {
-            if (!fileInput || fileInput.disabled) {
+            if (!primaryInput || primaryInput.disabled) {
                 return;
             }
-            fileInput.click();
+            primaryInput.click();
         });
     });
 
-    if (fileInput) {
-        fileInput.addEventListener("change", handleFileChange);
+    if (primaryInput) {
+        primaryInput.addEventListener("change", handleFileChange);
+    }
+    if (attachmentTrigger && attachmentInput) {
+        attachmentTrigger.addEventListener("click", function () {
+            if (!attachmentTrigger.disabled) {
+                attachmentInput.click();
+            }
+        });
+        attachmentInput.addEventListener("change", appendAttachments);
     }
 
     if (capSoButton && soKyHieuInput && capSoUrl && csrfTokenInput) {
@@ -232,6 +333,7 @@
         if (!recipientModal) {
             return;
         }
+        recipientModal.classList.remove("show");
         recipientModal.classList.add("hidden");
         if (recipientErrorBox) {
             recipientErrorBox.textContent = "";
@@ -240,9 +342,22 @@
 
     if (externalPublishButton && recipientModal) {
         externalPublishButton.addEventListener("click", function () {
+            recipientModal.classList.add("show");
             recipientModal.classList.remove("hidden");
             if (recipientErrorBox) {
                 recipientErrorBox.textContent = "";
+            }
+            if (dispatchNote) {
+                dispatchNote.value = "";
+            }
+            document.querySelectorAll(".recipient-checkbox").forEach(function (checkbox) {
+                checkbox.checked = false;
+            });
+            if (recipientSearchInput) {
+                recipientSearchInput.value = "";
+                recipientItems.forEach(function (item) {
+                    item.classList.remove("hidden");
+                });
             }
         });
     }
@@ -281,6 +396,7 @@
             checkedRecipients.forEach(function (checkbox) {
                 formData.append("noi_nhan_ids[]", checkbox.value);
             });
+            formData.append("ghi_chu", dispatchNote ? dispatchNote.value.trim() : "");
 
             fetch(externalPublishButton.dataset.publishUrl, {
                 method: "POST",
@@ -309,4 +425,5 @@
     }
 
     showPlaceholder();
+    renderAttachmentList();
 })();

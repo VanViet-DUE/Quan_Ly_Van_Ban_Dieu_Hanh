@@ -11,6 +11,8 @@ from .models import (
     NhatKyVanBan,
     NoiNhan,
     PhanCongXuLy,
+    TepDinhKemVanBanDen,
+    TepDinhKemVanBanDi,
     ToChuyenMon,
     VanBanDen,
     VanBanDi,
@@ -165,6 +167,22 @@ class NoiNhanAdmin(FullFieldsAdmin):
     readonly_fields = ("ma_noi_nhan",)
     list_display = ("ma_noi_nhan", "ten_noi_nhan", "dia_chi", "so_dien_thoai", "gmail")
     search_fields = ("ma_noi_nhan", "ten_noi_nhan", "dia_chi", "so_dien_thoai", "gmail", "thong_tin_khac")
+
+
+@admin.register(TepDinhKemVanBanDen)
+class TepDinhKemVanBanDenAdmin(FullFieldsAdmin):
+    readonly_fields = ("ma_tep", "ngay_tao")
+    list_display = ("ma_tep", "so_vb_den", "tep_tin", "thu_tu", "ngay_tao")
+    list_filter = ("ngay_tao",)
+    search_fields = ("ma_tep", "so_vb_den__so_vb_den", "so_vb_den__so_ky_hieu", "tep_tin")
+
+
+@admin.register(TepDinhKemVanBanDi)
+class TepDinhKemVanBanDiAdmin(FullFieldsAdmin):
+    readonly_fields = ("ma_tep", "ngay_tao")
+    list_display = ("ma_tep", "so_vb_di", "loai_tep", "tep_tin", "thu_tu", "ngay_tao")
+    list_filter = ("loai_tep", "ngay_tao")
+    search_fields = ("ma_tep", "so_vb_di__so_vb_di", "so_vb_di__so_ky_hieu", "tep_tin")
 
 
 @admin.register(LuanChuyenBenNgoai)

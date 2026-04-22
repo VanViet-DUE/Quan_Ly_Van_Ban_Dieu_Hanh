@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Đăng ký văn bản đến{% endblock %}
+{% block title %}Dang ky van ban den{% endblock %}
 
 {% block extra_css %}
     <link rel="stylesheet" href="{% static 'css/van_ban_den_form.css' %}">
@@ -62,7 +62,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="">Loại văn bản:</label>
+                    <label for="{{ form.ma_loai_vb.id_for_label }}">{{ form.ma_loai_vb.label }}:</label>
                     <div class="field-control">
                         {{ form.ma_loai_vb }}
                         {{ form.ma_loai_vb.errors }}
@@ -70,7 +70,7 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="">Mức độ ưu tiên:</label>
+                    <label for="{{ form.ma_muc_do.id_for_label }}">{{ form.ma_muc_do.label }}:</label>
                     <div class="field-control">
                         {{ form.ma_muc_do }}
                         {{ form.ma_muc_do.errors }}
@@ -97,13 +97,34 @@
                     <label for="{{ form.file_van_ban.id_for_label }}">{{ form.file_van_ban.label }}:</label>
                     <div class="field-control">
                         {{ form.file_van_ban }}
-                        <div class="file-input-wrapper" data-file-trigger>
-                            <input type="text" value="Nhấn biểu tượng để tải tệp PDF, Word hoặc ảnh scan" readonly class="form-control bg-gray" id="selected-file-name">
-                            <button type="button" class="btn-icon" id="trigger-file-button" aria-label="Tải tệp">
+                        <div class="file-input-wrapper" data-primary-file-trigger>
+                            <input
+                                type="text"
+                                value="Nhấn vào biểu tượng để tải tệp lên"
+                                readonly
+                                class="form-control bg-gray"
+                                id="selected-file-name"
+                            >
+                            <button type="button" class="btn-icon" id="trigger-file-button" aria-label="Tai tep van ban">
                                 <i class="bi bi-file-earmark-break"></i>
                             </button>
                         </div>
                         {{ form.file_van_ban.errors }}
+                    </div>
+                </div>
+
+                <div class="form-group form-group-full">
+                    <label for="{{ form.tep_dinh_kem_uploads.id_for_label }}">Tệp đính kèm:</label>
+                    <div class="field-control">
+                        {{ form.tep_dinh_kem_uploads }}
+                        <button type="button" class="btn-main btn-secondary btn-attachment-trigger" id="trigger-attachment-button">
+                            Thêm tệp đính kèm
+                        </button>
+                        {{ form.tep_dinh_kem_uploads.errors }}
+                        <div class="attachment-list hidden" id="attachment-list-wrapper">
+                            <div class="attachment-list-title">Danh sách tệp đính kèm</div>
+                            <div id="attachment-list"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -121,14 +142,14 @@
         <div class="preview-container">
             <div class="preview-header">
                 <h3>Xem trước văn bản</h3>
-                <p>PDF, Word (.docx) và ảnh scan sẽ hiển thị trực tiếp tại đây.</p>
+                <p>Khung chính thức chỉ hiện văn bản chính thức.</p>
             </div>
             <div class="preview-box" id="preview-box">
                 <div class="preview-placeholder" id="preview-placeholder">
                     Chưa có tệp nào được chọn.
                 </div>
-                <img src="" alt="Xem trước ảnh scan" id="preview-image" class="preview-element hidden">
-                <iframe id="preview-pdf" class="preview-element hidden" title="Xem trước PDF"></iframe>
+                <img src="" alt="Xem truoc anh scan" id="preview-image" class="preview-element hidden">
+                <iframe id="preview-pdf" class="preview-element hidden" title="Xem truoc PDF"></iframe>
                 <div id="preview-word" class="preview-element preview-word hidden"></div>
                 <div id="preview-message" class="preview-element preview-message hidden"></div>
             </div>

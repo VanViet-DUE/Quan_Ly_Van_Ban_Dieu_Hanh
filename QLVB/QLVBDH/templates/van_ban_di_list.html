@@ -69,8 +69,10 @@
                             data-nguoi-ky-display="{{ document.nguoi_ky_hien_thi }}"
                             data-ban-du-thao-name="{% if document.ban_du_thao %}{{ document.ban_du_thao.name|cut:'van_ban_di/du_thao/' }}{% endif %}"
                             data-ban-du-thao-url="{% if document.ban_du_thao %}{{ document.ban_du_thao.url }}{% endif %}"
+                            data-ban-du-thao-attachments-json="{{ document.ban_du_thao_attachments_json|default:'[]'|escape }}"
                             data-ban-chinh-thuc-name="{% if document.ban_chinh_thuc %}{{ document.ban_chinh_thuc.name|cut:'van_ban_di/chinh_thuc/' }}{% endif %}"
                             data-ban-chinh-thuc-url="{% if document.ban_chinh_thuc %}{{ document.ban_chinh_thuc.url }}{% endif %}"
+                            data-ban-chinh-thuc-attachments-json="{{ document.ban_chinh_thuc_attachments_json|default:'[]'|escape }}"
                         >
                             <td class="text-center" data-col="so-di">{{ document.so_vb_di }}</td>
                             <td class="text-center {% if not document.ngay_ban_hanh %}color{% endif %}" data-col="ngay-ban-hanh">
@@ -85,7 +87,7 @@
                             <td data-col="trich-yeu">{{ document.trich_yeu }}</td>
                             <td data-col="noi-nhan">{{ document.noi_nhan }}</td>
                             <td class="text-center" data-col="trang-thai">
-                                <span class="status-badge {{ document.status_css_class }}">{{ document.trang_thai_vb_di }}</span>
+                                <span class="status-badge {{ document.status_css_class }}">{{ document.trang_thai_hien_thi }}</span>
                             </td>
                         </tr>
                     {% empty %}
@@ -110,6 +112,7 @@
                     <input type="hidden" id="transfer-url">
                     <input type="hidden" id="external-publish-url">
                     <input type="hidden" id="internal-publish-url">
+                    <input type="hidden" id="m-attachment-delete-ids" name="tep_dinh_kem_xoa_ids">
                     <div class="form-row">
                         <div class="form-group">
                             <label>Số văn bản đi:</label>
@@ -119,7 +122,7 @@
                             <label>Trạng thái:</label>
                             <select id="m-trang-thai" name="trang_thai_vb_di" disabled>
                                 {% for status in document_status_choices %}
-                                    <option value="{{ status }}">{{ status }}</option>
+                                    <option value="{{ status.value }}">{{ status.label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -184,7 +187,7 @@
                     <div class="form-group-full file-input">
                         <label>File dự thảo:</label>
                         <div class="file-input-wrapper view-only-file">
-                            <input type="file" id="m-ban-du-thao-upload" name="ban_du_thao" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*">
+                            <input type="file" id="m-ban-du-thao-upload" name="ban_du_thao_uploads" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*" multiple>
                             <a id="m-ban-du-thao-link" class="file-link disabled" href="#" target="_blank" rel="noopener noreferrer">
                                 <input type="text" id="m-ban-du-thao-name" readonly>
                             </a>
@@ -196,13 +199,21 @@
                     <div class="form-group-full file-input">
                         <label>File chính thức:</label>
                         <div class="file-input-wrapper view-only-file">
-                            <input type="file" id="m-ban-chinh-thuc-upload" name="ban_chinh_thuc" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*">
+                            <input type="file" id="m-ban-chinh-thuc-upload" name="ban_chinh_thuc_uploads" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*" multiple>
                             <a id="m-ban-chinh-thuc-link" class="file-link disabled" href="#" target="_blank" rel="noopener noreferrer">
                                 <input type="text" id="m-ban-chinh-thuc-name" readonly>
                             </a>
                             <button type="button" id="m-ban-chinh-thuc-trigger" class="btn-icon file-link-icon" disabled aria-label="Tải tệp chính thức">
                                 <i class="bi bi-file-earmark-break"></i>
                             </button>
+                        </div>
+                    </div>
+                    <div class="form-group-full">
+                        <label>Tệp đính kèm:</label>
+                        <div class="attachment-list-view" id="m-official-attachment-list"></div>
+                        <div class="attachment-upload-row">
+                            <input type="file" id="m-official-attachment-upload" name="tep_dinh_kem_chinh_thuc_uploads" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*" multiple>
+                            <button type="button" id="m-official-attachment-upload-trigger" class="btn-primary attachment-upload-trigger" disabled>Thêm tệp đính kèm</button>
                         </div>
                     </div>
                     <div class="form-errors" id="modal-form-errors"></div>
@@ -228,6 +239,14 @@
                     <button type="button" class="close-btn" id="close-recipient-modal">&times;</button>
                 </div>
                 <div class="modal-body">
+                    <div class="form-group-full">
+                        <label>Nguoi thuc hien:</label>
+                        <input type="text" id="dispatch-operator-name" value="{{ display_ho_ten }}" readonly>
+                    </div>
+                    <div class="form-group-full">
+                        <label>Ghi chu:</label>
+                        <textarea id="dispatch-note" rows="3" placeholder="Nhap ghi chu phat hanh ben ngoai"></textarea>
+                    </div>
                     <div class="search-input-wrapper">
                         <i class="bi bi-search search-icon"></i>
                         <input type="text" id="recipient-search-input" placeholder="Tìm nơi nhận...">

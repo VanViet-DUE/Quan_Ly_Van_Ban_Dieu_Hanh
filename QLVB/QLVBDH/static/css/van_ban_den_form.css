@@ -211,6 +211,55 @@ textarea.form-control {
     margin-right: 5px;
 }
 
+.btn-attachment-trigger {
+    margin-top: 10px;
+}
+
+.attachment-list {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.attachment-list-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1b4e7b;
+}
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.attachment-link {
+    color: #1b4e7b;
+    text-decoration: none;
+    word-break: break-word;
+}
+
+.attachment-link:hover {
+    text-decoration: underline;
+}
+
+.attachment-delete {
+    border: none;
+    border-radius: 6px;
+    background: #b42318;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
 .preview-container {
     flex: 1;
     border: 4px double #999;
@@ -246,7 +295,8 @@ textarea.form-control {
 }
 
 .preview-element.hidden,
-.preview-placeholder.hidden {
+.preview-placeholder.hidden,
+.hidden {
     display: none;
 }
 

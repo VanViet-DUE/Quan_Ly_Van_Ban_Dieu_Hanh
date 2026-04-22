@@ -12,3 +12,15 @@
 #vanbandatao.active {
     border-radius: 0;
 }
+#xemvbd,
+#dkvbd,
+#phbng {
+    border-radius: 0;
+    padding: 10px;
+}
+
+#xemvbd:hover,
+#dkvbd:hover,
+#phbng:hover {
+    background-color: rgba(255, 255, 255, 0.267);
+}

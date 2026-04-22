@@ -9,10 +9,10 @@
 
 {% block sidebar %}
     <a class="combo-button{% if is_personal_processing_list %} active{% endif %}" id="vanbanxuly" href="{% url 'van_ban_xu_ly_ca_nhan' %}">
-        <label>Van ban xu ly</label>
+        <label>Văn bản xử lý</label>
     </a>
     <a class="combo-button{% if is_personal_returned_list %} active{% endif %}" id="vanbantralai" href="{% url 'van_ban_tra_lai' %}">
-        <label>Van ban tra lai</label>
+        <label>Văn bản trả lại</label>
     </a>
 {% endblock %}
 
@@ -36,13 +36,13 @@
                     <thead>
                         <tr>
                             <th>STT</th>
-                            <th>Ngay ban hanh</th>
-                            <th>So van ban</th>
-                            <th>Loai van ban</th>
-                            <th>So ky hieu</th>
-                            <th>Trich yeu van ban</th>
-                            <th>Nguoi phan cong</th>
-                            <th>Trang thai</th>
+                            <th>Ngay ban hành</th>
+                            <th>Số văn bản</th>
+                            <th>Loại văn bản</th>
+                            <th>Số ký hiệu</th>
+                            <th>Trích yếu văn bản</th>
+                            <th>Người phân công</th>
+                            <th>Trạng thái</th>
                         </tr>
                     </thead>
                     <tbody id="personal-table-body">
@@ -72,7 +72,7 @@
                                 <td class="text-center"><span class="status-badge">{{ document.trang_thai_xl }}</span></td>
                             </tr>
                         {% empty %}
-                            <tr><td colspan="8" class="empty-state">Khong co van ban nao trong muc xu ly.</td></tr>
+                            <tr><td colspan="8" class="empty-state">Không có văn bản nào trong mục xử lý.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -82,38 +82,38 @@
         <div id="personal-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
-                    <span>CHI TIET VAN BAN XU LY</span>
+                    <span>CHI TIẾT VĂN BẢN XỬ LÝ</span>
                     <button type="button" class="close-btn" id="close-personal-modal">&times;</button>
                 </div>
                 <form class="modal-body" id="personal-form">
                     {% csrf_token %}
                     <input type="hidden" id="p-assignment-id">
                     <div class="form-row">
-                        <div class="form-group"><label>So van ban:</label><input type="text" id="p-so-van-ban" readonly></div>
-                        <div class="form-group"><label>Ngay ban hanh:</label><input type="text" id="p-ngay-ban-hanh" readonly></div>
+                        <div class="form-group"><label>Số văn bản:</label><input type="text" id="p-so-van-ban" readonly></div>
+                        <div class="form-group"><label>Ngày ban hành:</label><input type="text" id="p-ngay-ban-hanh" readonly></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label>Loai van ban:</label><input type="text" id="p-loai-vb" readonly></div>
-                        <div class="form-group"><label>So ky hieu:</label><input type="text" id="p-so-ky-hieu" readonly></div>
+                        <div class="form-group"><label>Loại văn bản:</label><input type="text" id="p-loai-vb" readonly></div>
+                        <div class="form-group"><label>Số ký hiệu:</label><input type="text" id="p-so-ky-hieu" readonly></div>
                     </div>
-                    <div class="form-group-full"><label>Trich yeu:</label><textarea id="p-trich-yeu" rows="3" readonly></textarea></div>
+                    <div class="form-group-full"><label>Trích yếu:</label><textarea id="p-trich-yeu" rows="3" readonly></textarea></div>
                     <div class="form-row">
-                        <div class="form-group"><label>Co quan ban hanh:</label><input type="text" id="p-co-quan" readonly></div>
-                        <div class="form-group"><label>Nguoi phan cong:</label><input type="text" id="p-nguoi-phan-cong" readonly></div>
+                        <div class="form-group"><label>Cơ quan ban hành:</label><input type="text" id="p-co-quan" readonly></div>
+                        <div class="form-group"><label>Người phân công:</label><input type="text" id="p-nguoi-phan-cong" readonly></div>
                     </div>
-                    <div class="form-group-full"><label>Noi dung chi dao:</label><textarea id="p-noi-dung-cd" rows="3" readonly></textarea></div>
+                    <div class="form-group-full"><label>Nội dung chỉ đạo:</label><textarea id="p-noi-dung-cd" rows="3" readonly></textarea></div>
                     <div class="form-row">
-                        <div class="form-group"><label>Thoi han:</label><input type="date" id="p-thoi-han" readonly></div>
+                        <div class="form-group"><label>Thời hạn:</label><input type="date" id="p-thoi-han" readonly></div>
                         <div class="form-group">
-                            <label>Cap nhat tien do:</label>
+                            <label>Cập nhật tiến độ:</label>
                             <select id="p-trang-thai-xu-ly">
-                                <option value="Dang xu ly">Dang xu ly</option>
-                                <option value="Da hoan thanh">Da hoan thanh</option>
+                                <option value="Dang xu ly"Đang xử lý</option>
+                                <option value="Da hoan thanh">Đã hoàn thành</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-group-full file-input">
-                        <label>File van ban:</label>
+                        <label>File văn bản:</label>
                         <div class="file-input-wrapper">
                             <a id="p-file-link" class="file-link disabled" href="#" target="_blank" rel="noopener noreferrer">
                                 <input type="text" id="p-file-name" readonly>
@@ -123,9 +123,9 @@
                     </div>
                     <div class="form-errors" id="personal-form-errors"></div>
                     <div class="modal-footer">
-                        <button type="button" id="btn-update-progress" class="btn-primary">Cap nhat</button>
+                        <button type="button" id="btn-update-progress" class="btn-primary">Cập nhật</button>
                         {% if can_transfer_assignment %}
-                            <button type="button" id="btn-transfer-assignment" class="btn-success">Chuyen phan cong</button>
+                            <button type="button" id="btn-transfer-assignment" class="btn-success">Chuyển phân công</button>
                         {% endif %}
                     </div>
                 </form>
@@ -149,13 +149,13 @@
                     <thead>
                         <tr>
                             <th>STT</th>
-                            <th>Ngay ban hanh</th>
-                            <th>So van ban</th>
-                            <th>Loai van ban</th>
-                            <th>So ky hieu</th>
-                            <th>Trich yeu van ban</th>
-                            <th>Nguoi yeu cau</th>
-                            <th>Trang thai</th>
+                            <th>Ngày ban hành</th>
+                            <th>Số văn bản</th>
+                            <th>Loại văn bản</th>
+                            <th>Số ký hiệu</th>
+                            <th>Trích yếu văn bản</th>
+                            <th>Người yêu cầu</th>
+                            <th>Trạng thái</th>
                         </tr>
                     </thead>
                     <tbody id="personal-table-body">
@@ -184,7 +184,7 @@
                                 <td class="text-center"><span class="status-badge">{{ document.trang_thai }}</span></td>
                             </tr>
                         {% empty %}
-                            <tr><td colspan="8" class="empty-state">Khong co van ban nao bi tra lai.</td></tr>
+                            <tr><td colspan="8" class="empty-state">Không có văn bản nào bị trả lại.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
@@ -194,44 +194,44 @@
         <div id="returned-modal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
-                    <span>CHI TIET VAN BAN TRA LAI</span>
+                    <span>CHI TIẾT VĂN BẢN TRẢ LẠI</span>
                     <button type="button" class="close-btn" id="close-returned-modal">&times;</button>
                 </div>
                 <form class="modal-body" id="returned-form">
                     {% csrf_token %}
                     <input type="hidden" id="r-record-id">
                     <div class="form-row">
-                        <div class="form-group"><label>So van ban:</label><input type="text" id="r-so-van-ban" readonly></div>
-                        <div class="form-group"><label>Ngay ban hanh:</label><input type="text" id="r-ngay-ban-hanh" readonly></div>
+                        <div class="form-group"><label>Số văn bản:</label><input type="text" id="r-so-van-ban" readonly></div>
+                        <div class="form-group"><label>Ngày ban hành:</label><input type="text" id="r-ngay-ban-hanh" readonly></div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Loai van ban:</label>
+                            <label>Loại văn bản:</label>
                             <select id="r-loai-vb" name="ma_loai_vb">
                                 {% for loai_van_ban in loai_van_ban_list %}
                                     <option value="{{ loai_van_ban.pk }}">{{ loai_van_ban.ten_loai_vb }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="form-group"><label>So ky hieu:</label><input type="text" id="r-so-ky-hieu" readonly></div>
+                        <div class="form-group"><label>Số ký hiệu:</label><input type="text" id="r-so-ky-hieu" readonly></div>
                     </div>
-                    <div class="form-group-full"><label>Trich yeu:</label><textarea id="r-trich-yeu" name="trich_yeu" rows="3"></textarea></div>
+                    <div class="form-group-full"><label>Trích yếu:</label><textarea id="r-trich-yeu" name="trich_yeu" rows="3"></textarea></div>
                     <div class="form-row">
-                        <div class="form-group"><label>Nguoi yeu cau chinh sua:</label><input type="text" id="r-nguoi-yeu-cau" readonly></div>
-                        <div class="form-group"><label>Trang thai:</label><input type="text" id="r-trang-thai" readonly></div>
+                        <div class="form-group"><label>Người yêu cầu chỉnh sửa:</label><input type="text" id="r-nguoi-yeu-cau" readonly></div>
+                        <div class="form-group"><label>Trạng tha:</label><input type="text" id="r-trang-thai" readonly></div>
                     </div>
-                    <div class="form-group-full"><label>Noi dung yeu cau:</label><textarea id="r-noi-dung-yeu-cau" rows="4" readonly></textarea></div>
+                    <div class="form-group-full"><label>Nội dung yêu cầu:</label><textarea id="r-noi-dung-yeu-cau" rows="4" readonly></textarea></div>
                     <div class="form-group-full file-input">
-                        <label>Tai lai file du thao:</label>
+                        <label>Tải lại file dự thảo:</label>
                         <div class="file-input-wrapper">
                             <input type="text" id="r-file-name" readonly value="Khong bat buoc tai lai tep">
                             <label class="btn-icon upload-trigger" for="r-file-upload"><i class="bi bi-upload"></i></label>
                         </div>
-                        <input type="file" id="r-file-upload" name="ban_du_thao" class="hidden" accept=".pdf,.doc,.docx,image/*">
+                        <input type="file" id="r-file-upload" name="ban_du_thao" class="hidden" accept=".pdf,.doc,.docx,image/*" multiple>
                     </div>
                     <div class="form-errors" id="returned-form-errors"></div>
                     <div class="modal-footer">
-                        <button type="button" id="btn-complete-revision" class="btn-primary">Hoan thanh</button>
+                        <button type="button" id="btn-complete-revision" class="btn-primary">Hoàn thành</button>
                     </div>
                 </form>
             </div>
@@ -241,7 +241,7 @@
     <div id="notification-overlay" class="notification-overlay hidden">
         <div class="notification-box">
             <i class="bi bi-check-circle-fill"></i>
-            <p id="notification-message">Cap nhat thanh cong!</p>
+            <p id="notification-message">Cập nhật thành công!</p>
         </div>
     </div>
 {% endblock %}

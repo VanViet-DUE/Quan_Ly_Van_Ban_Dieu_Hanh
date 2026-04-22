@@ -60,6 +60,7 @@
                             data-muc-do-id="{{ document.ma_muc_do_id }}"
                             data-file-name="{{ document.file_van_ban.name|cut:'van_ban_den/' }}"
                             data-file-url="{% if document.file_van_ban %}{{ document.file_van_ban.url }}{% endif %}"
+                            data-attachments-json="{{ document.attachments_json|escape }}"
                         >
                             <td class="text-center" data-col="so-den">{{ document.so_vb_den }}</td>
                             <td class="text-center" data-col="ngay-nhan">{{ document.ngay_nhan|date:"d/m/Y" }}</td>
@@ -68,7 +69,7 @@
                             <td data-col="trich-yeu">{{ document.trich_yeu }}</td>
                             <td data-col="co-quan">{{ document.co_quan_ban_hanh }}</td>
                             <td class="text-center" data-col="trang-thai">
-                                <span class="status-badge {{ document.status_css_class }}">{{ document.trang_thai_vb_den }}</span>
+                                <span class="status-badge {{ document.status_css_class }}">{{ document.trang_thai_hien_thi }}</span>
                             </td>
                         </tr>
                     {% empty %}
@@ -90,6 +91,7 @@
                     {% csrf_token %}
                     <input type="hidden" id="update-url">
                     <input type="hidden" id="publish-url">
+                    <input type="hidden" id="m-attachment-delete-ids" name="tep_dinh_kem_xoa_ids">
                     <div class="form-row">
                         <div class="form-group">
                             <label>Số văn bản đến:</label>
@@ -99,7 +101,7 @@
                             <label>Tình trạng:</label>
                             <select id="m-trang-thai" name="trang_thai_vb_den" disabled>
                                 {% for status in document_status_choices %}
-                                    <option value="{{ status }}">{{ status }}</option>
+                                    <option value="{{ status.value }}">{{ status.label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -145,13 +147,21 @@
                     <div class="form-group-full file-input">
                         <label>File văn bản:</label>
                         <div class="file-input-wrapper view-only-file">
-                            <input type="file" id="m-file-upload" name="file_van_ban" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*">
+                            <input type="file" id="m-file-upload" name="file_van_ban_uploads" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*" multiple>
                             <a id="m-file-link" class="file-link disabled" href="#" target="_blank" rel="noopener noreferrer">
                                 <input type="text" id="m-file-name" readonly>
                             </a>
                             <button type="button" id="m-file-upload-trigger" class="btn-icon file-link-icon" disabled aria-label="Tai tep moi">
                                 <i class="bi bi-file-earmark-break"></i>
                             </button>
+                        </div>
+                    </div>
+                    <div class="form-group-full">
+                        <label>Tep dinh kem:</label>
+                        <div class="attachment-list-view" id="m-attachment-list"></div>
+                        <div class="attachment-upload-row">
+                            <input type="file" id="m-attachment-upload" name="tep_dinh_kem_uploads" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*" multiple>
+                            <button type="button" id="m-attachment-upload-trigger" class="btn-primary attachment-upload-trigger" disabled>Thêm tệp đính kèm</button>
                         </div>
                     </div>
                     <div class="form-errors" id="modal-form-errors"></div>

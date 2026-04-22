@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.db import models
@@ -16,7 +16,9 @@ from django.utils import timezone
 
 from .forms import (
     CapNhatMauVanBanForm,
+    DoiMatKhauCaNhanForm,
     GiaoVienTaiKhoanForm,
+    HoSoCaNhanForm,
     PhanQuyenNguoiDungForm,
     TaoVanBanDiForm,
     ThemGiaoVienForm,
@@ -35,6 +37,8 @@ from .models import (
     NhatKyVanBan,
     NoiNhan,
     PhanCongXuLy,
+    TepDinhKemVanBanDen,
+    TepDinhKemVanBanDi,
     ToChuyenMon,
     VanBanDen,
     VanBanDi,
@@ -121,17 +125,36 @@ def is_outgoing_post_registration_status(trang_thai):
     return normalized in allowed_statuses
 
 
+def get_choice_label(choice_class, value):
+    for choice in choice_class:
+        if choice.value == value:
+            return choice.label
+    return (value or "").strip()
+
+
+def build_choice_options(choice_class, values):
+    return [{"value": value, "label": get_choice_label(choice_class, value)} for value in values]
+
+
+def get_van_ban_den_status_label(trang_thai):
+    return get_choice_label(VanBanDen.TrangThai, trang_thai)
+
+
+def get_van_ban_di_status_label(trang_thai):
+    return get_choice_label(VanBanDi.TrangThai, trang_thai)
+
+
 def get_progress_status_info(trang_thai):
     normalized = normalize_text(trang_thai)
     if normalized == normalize_text(PhanCongXuLy.TrangThaiXuLy.DA_HOAN_THANH):
         return {
-            "label": "Da hoan thanh",
+            "label": "Đã hoàn thành",
             "css_class": "status-complete",
             "rank": 3,
         }
     if normalized == normalize_text(PhanCongXuLy.TrangThaiXuLy.DANG_XU_LY):
         return {
-            "label": "Dang xu ly",
+            "label": "Đang xử lý",
             "css_class": "status-processing",
             "rank": 2,
         }
@@ -140,12 +163,12 @@ def get_progress_status_info(trang_thai):
         "chua xu ly",
     }:
         return {
-            "label": "Cho xu ly",
+            "label": "Chờ xử lý",
             "css_class": "status-received",
             "rank": 1,
         }
     return {
-        "label": (trang_thai or "Cho xu ly").strip() or "Cho xu ly",
+        "label": (trang_thai or "Chờ xử lý").strip() or "Chờ xử lý",
         "css_class": "status-received",
         "rank": 1,
     }
@@ -506,11 +529,46 @@ def serialize_recipient_row_html(request, recipient):
     ).content.decode("utf-8")
 
 
+def serialize_external_dispatch_record(record):
+    document = record.ma_vb_di
+    attachments = (
+        serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+        or serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+    )
+    primary_attachment = (
+        build_primary_file_payload(document.ban_chinh_thuc)
+        if document.ban_chinh_thuc
+        else build_primary_file_payload(document.ban_du_thao)
+    )
+    return {
+        "record_id": record.pk,
+        "so_van_ban": document.so_vb_di,
+        "ngay_ban_hanh_display": (
+            (document.ngay_ban_hanh or document.ngay_ky).strftime("%d/%m/%Y")
+            if (document.ngay_ban_hanh or document.ngay_ky)
+            else ""
+        ),
+        "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
+        "so_ky_hieu": document.so_ky_hieu,
+        "trich_yeu": document.trich_yeu,
+        "trang_thai": record.trang_thai_gui,
+        "noi_nhan_tong_hop": record.ma_noi_nhan.ten_noi_nhan,
+        "nguoi_thuc_hien": record.nguoi_thuc_hien.ho_ten,
+        "nguoi_thuc_hien_id": record.nguoi_thuc_hien_id,
+        "ghi_chu": record.ghi_chu,
+        "ma_noi_nhan": record.ma_noi_nhan_id,
+        "thoi_gian_gui": (
+            timezone.localtime(record.thoi_gian_gui).strftime("%d/%m/%Y %H:%M")
+            if record.thoi_gian_gui
+            else ""
+        ),
+        "file_name": primary_attachment["name"],
+        "file_url": primary_attachment["url"],
+        "attachments_json": serialize_attachment_json(attachments),
+    }
+
+
 def get_document_signers_display(document):
-    if normalize_text(getattr(document, "trang_thai_vb_di", "")) not in {
-        normalize_text(VanBanDi.TrangThai.DA_HOAN_THANH),
-    } and not getattr(document, "da_ban_hanh_noi_bo", False):
-        return ""
     signed_records = list(
         document.xu_lys.select_related("ma_gv")
         .filter(trang_thai_ky=XuLy.TRANG_THAI_DA_DUYET)
@@ -529,7 +587,90 @@ def get_document_signers_display(document):
     return document.nguoi_ky.ho_ten if getattr(document, "nguoi_ky", None) else ""
 
 
+def build_attachment_payload(name, url, attachment_id="", attachment_type=""):
+    return {
+        "id": attachment_id,
+        "type": attachment_type,
+        "name": name.split("/")[-1] if name else "",
+        "url": url or "",
+    }
+
+
+def build_primary_file_payload(file_field):
+    if not file_field:
+        return {"name": "", "url": ""}
+    return build_attachment_payload(file_field.name, getattr(file_field, "url", ""))
+
+
+def serialize_personal_profile(giao_vien):
+    if giao_vien is None:
+        return {}
+    return {
+        "ma_gv": giao_vien.ma_gv,
+        "ho_ten": giao_vien.ho_ten,
+        "lan_cuoi_dang_nhap": get_teacher_last_login_display(giao_vien),
+        "nhom_quyen_display": giao_vien.ten_nhom_quyen_hien_thi or "Chua phan quyen",
+    }
+
+
+def serialize_incoming_attachments(document):
+    return [
+        build_attachment_payload(item.tep_tin.name, item.tep_tin.url if item.tep_tin else "", item.ma_tep, "den")
+        for item in document.get_file_attachments()
+        if item.tep_tin
+    ]
+
+
+def serialize_outgoing_attachments(document, loai_tep):
+    if loai_tep == TepDinhKemVanBanDi.LoaiTep.DU_THAO:
+        return [
+            build_attachment_payload(item.tep_tin.name, item.tep_tin.url if item.tep_tin else "", item.ma_tep, loai_tep)
+            for item in document.get_draft_attachments()
+            if item.tep_tin
+        ]
+    return [
+        build_attachment_payload(item.tep_tin.name, item.tep_tin.url if item.tep_tin else "", item.ma_tep, loai_tep)
+        for item in document.get_official_attachments()
+        if item.tep_tin
+    ]
+
+
+def serialize_outgoing_supporting_attachments(document, loai_tep):
+    if loai_tep == TepDinhKemVanBanDi.LoaiTep.DU_THAO:
+        return [
+            build_attachment_payload(item.tep_tin.name, item.tep_tin.url if item.tep_tin else "")
+            for item in document.get_draft_attachments()
+            if item.tep_tin
+        ]
+    return [
+        build_attachment_payload(item.tep_tin.name, item.tep_tin.url if item.tep_tin else "")
+        for item in document.get_official_attachments()
+        if item.tep_tin
+    ]
+
+
+def get_primary_attachment(attachments):
+    return attachments[0] if attachments else {"name": "", "url": ""}
+
+
+def serialize_attachment_json(attachments):
+    return json.dumps(attachments, ensure_ascii=True)
+
+
+def copy_request_files_with_aliases(request, aliases):
+    files = request.FILES.copy()
+    for target_name, source_name in aliases.items():
+        if files.getlist(target_name):
+            continue
+        source_files = files.getlist(source_name)
+        if source_files:
+            files.setlist(target_name, source_files)
+    return files
+
+
 def serialize_van_ban_den_list_document(document):
+    attachments = serialize_incoming_attachments(document)
+    primary_attachment = build_primary_file_payload(document.file_van_ban)
     return {
         "so_vb_den": document.so_vb_den,
         "ngay_nhan": document.ngay_nhan.strftime("%d/%m/%Y"),
@@ -538,16 +679,21 @@ def serialize_van_ban_den_list_document(document):
         "trich_yeu": document.trich_yeu,
         "co_quan_ban_hanh": document.co_quan_ban_hanh,
         "trang_thai_vb_den": document.trang_thai_vb_den,
+        "trang_thai_hien_thi": get_van_ban_den_status_label(document.trang_thai_vb_den),
         "da_ban_hanh_noi_bo": document.da_ban_hanh_noi_bo,
         "status_class": get_van_ban_den_status_class(document.trang_thai_vb_den),
         "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
         "muc_do": document.ma_muc_do.muc_do,
-        "file_name": document.file_van_ban.name.split("/")[-1] if document.file_van_ban else "",
-        "file_url": document.file_van_ban.url if document.file_van_ban else "",
+        "file_name": primary_attachment["name"],
+        "file_url": primary_attachment["url"],
+        "attachments": attachments,
+        "attachments_json": serialize_attachment_json(attachments),
     }
 
 
 def serialize_van_ban_can_duyet(document):
+    draft_attachments = serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+    primary_draft_attachment = build_primary_file_payload(document.ban_du_thao)
     assignment_status = "Da phan cong" if get_real_assignments_queryset(document).exists() else "Chua phan cong"
     return {
         "so_vb_di": document.so_vb_di,
@@ -561,8 +707,10 @@ def serialize_van_ban_can_duyet(document):
         "nguoi_tao": document.nguoi_tao.ho_ten,
         "nguoi_ky": get_document_signers_display(document),
         "noi_nhan": document.noi_nhan,
-        "ban_du_thao_name": document.ban_du_thao.name.split("/")[-1] if document.ban_du_thao else "",
-        "ban_du_thao_url": document.ban_du_thao.url if document.ban_du_thao else "",
+        "ban_du_thao_name": primary_draft_attachment["name"],
+        "ban_du_thao_url": primary_draft_attachment["url"],
+        "ban_du_thao_attachments": draft_attachments,
+        "ban_du_thao_attachments_json": serialize_attachment_json(draft_attachments),
         "assigned_ids": [assignment.nguoi_xu_ly_id for assignment in get_real_assignments_queryset(document)],
         "assigned_names": [assignment.nguoi_xu_ly.ho_ten for assignment in get_real_assignments_queryset(document)],
         "chi_dao": get_real_assignments_queryset(document).first().noi_dung_cd if get_real_assignments_queryset(document).exists() else "",
@@ -613,6 +761,8 @@ def build_assignment_documents(*, incoming_status, outgoing_status):
 
     documents = []
     for document in incoming_documents:
+        attachments = serialize_incoming_attachments(document)
+        primary_attachment = build_primary_file_payload(document.file_van_ban)
         documents.append(
             {
                 "loai": "den",
@@ -626,8 +776,9 @@ def build_assignment_documents(*, incoming_status, outgoing_status):
                 "muc_do": document.ma_muc_do.muc_do,
                 "priority_rank": get_priority_rank(document.ma_muc_do.muc_do),
                 "thoi_gian": document.ngay_nhan,
-                "file_name": document.file_van_ban.name.split("/")[-1] if document.file_van_ban else "",
-                "file_url": document.file_van_ban.url if document.file_van_ban else "",
+                "file_name": primary_attachment["name"],
+                "file_url": primary_attachment["url"],
+                "attachments_json": serialize_attachment_json(attachments),
                 "noi_dung_cd": get_real_assignments_queryset(document).first().noi_dung_cd if get_real_assignments_queryset(document).exists() else "",
                 "thoi_han": (
                     get_real_assignments_queryset(document).first().thoi_han.strftime("%Y-%m-%d")
@@ -648,6 +799,8 @@ def build_assignment_documents(*, incoming_status, outgoing_status):
         )
 
     for document in outgoing_documents:
+        attachments = serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+        primary_attachment = build_primary_file_payload(document.ban_chinh_thuc)
         documents.append(
             {
                 "loai": "di",
@@ -661,8 +814,9 @@ def build_assignment_documents(*, incoming_status, outgoing_status):
                 "muc_do": document.ma_muc_do.muc_do,
                 "priority_rank": get_priority_rank(document.ma_muc_do.muc_do),
                 "thoi_gian": document.ngay_ky,
-                "file_name": document.ban_chinh_thuc.name.split("/")[-1] if document.ban_chinh_thuc else "",
-                "file_url": document.ban_chinh_thuc.url if document.ban_chinh_thuc else "",
+                "file_name": primary_attachment["name"],
+                "file_url": primary_attachment["url"],
+                "attachments_json": serialize_attachment_json(attachments),
                 "noi_dung_cd": get_real_assignments_queryset(document).first().noi_dung_cd if get_real_assignments_queryset(document).exists() else "",
                 "thoi_han": (
                     get_real_assignments_queryset(document).first().thoi_han.strftime("%Y-%m-%d")
@@ -725,6 +879,16 @@ def build_assigned_documents_for_user(giao_vien):
             continue
 
         phan_congs = get_real_assignments_queryset(document).select_related("nguoi_xu_ly")
+        attachments = (
+            serialize_incoming_attachments(document)
+            if loai == "den"
+            else serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+        )
+        primary_attachment = (
+            build_primary_file_payload(document.file_van_ban)
+            if loai == "den"
+            else build_primary_file_payload(document.ban_chinh_thuc)
+        )
         documents.append(
             {
                 "loai": loai,
@@ -741,20 +905,9 @@ def build_assigned_documents_for_user(giao_vien):
                 "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
                 "priority_rank": get_priority_rank(document.ma_muc_do.muc_do),
                 "thoi_gian": document.ngay_nhan if loai == "den" else document.ngay_ky,
-                "file_name": (
-                    document.file_van_ban.name.split("/")[-1]
-                    if loai == "den" and document.file_van_ban
-                    else document.ban_chinh_thuc.name.split("/")[-1]
-                    if loai == "di" and document.ban_chinh_thuc
-                    else ""
-                ),
-                "file_url": (
-                    document.file_van_ban.url
-                    if loai == "den" and document.file_van_ban
-                    else document.ban_chinh_thuc.url
-                    if loai == "di" and document.ban_chinh_thuc
-                    else ""
-                ),
+                "file_name": primary_attachment["name"],
+                "file_url": primary_attachment["url"],
+                "attachments_json": serialize_attachment_json(attachments),
                 "noi_dung_cd": assignment.noi_dung_cd,
                 "thoi_han": assignment.thoi_han.strftime("%Y-%m-%d") if assignment.thoi_han else "",
                 "assigned_ids": list(phan_congs.values_list("nguoi_xu_ly_id", flat=True)),
@@ -791,6 +944,8 @@ def build_manual_outgoing_registration_document(*, so_vb_di, trang_thai):
         nguoi_ky=empty_teacher,
         ban_du_thao=None,
         ban_chinh_thuc=None,
+        draft_attachments=[],
+        official_attachments=[],
     )
 
 
@@ -910,6 +1065,47 @@ def build_priority_processing_count_items():
     return [(f"{label}:", counts[label]) for label in priority_labels]
 
 
+def build_status_count_items(queryset, field_name, statuses, choice_class=None):
+    counts = {}
+    for row in queryset.values(field_name).order_by().annotate(total=models.Count("pk")):
+        counts[row[field_name]] = row["total"]
+    if choice_class is None:
+        choice_class = VanBanDen.TrangThai if field_name == "trang_thai_vb_den" else VanBanDi.TrangThai
+    return [(f"{get_choice_label(choice_class, status)}:", counts.get(status, 0)) for status in statuses]
+
+
+def build_priority_processing_count_items():
+    priority_labels = ["Hỏa tốc", "Thượng khẩn", "Khẩn", "Bình thường"]
+    counts = {label: 0 for label in priority_labels}
+    incoming_processing_statuses = [
+        VanBanDen.TrangThai.CHO_PHAN_CONG,
+        VanBanDen.TrangThai.CHO_XU_LY,
+    ]
+    outgoing_processing_statuses = [
+        VanBanDi.TrangThai.CHO_DUYET,
+        VanBanDi.TrangThai.DANG_CHINH_SUA,
+        VanBanDi.TrangThai.CHO_DANG_KY,
+        VanBanDi.TrangThai.CHO_LUAN_CHUYEN,
+        VanBanDi.TrangThai.CHO_PHAN_CONG,
+    ]
+
+    for muc_do in VanBanDen.objects.filter(trang_thai_vb_den__in=incoming_processing_statuses).values_list("ma_muc_do__muc_do", flat=True):
+        normalized = normalize_text(muc_do)
+        for label in priority_labels:
+            if normalize_text(label) == normalized:
+                counts[label] += 1
+                break
+
+    for muc_do in VanBanDi.objects.filter(trang_thai_vb_di__in=outgoing_processing_statuses).values_list("ma_muc_do__muc_do", flat=True):
+        normalized = normalize_text(muc_do)
+        for label in priority_labels:
+            if normalize_text(label) == normalized:
+                counts[label] += 1
+                break
+
+    return [(f"{label}:", counts[label]) for label in priority_labels]
+
+
 # Nhom view dieu huong, dang nhap va cac man hinh tong quan van ban.
 def login_view(request):
     next_url = request.GET.get("next") or request.POST.get("next") or ""
@@ -965,7 +1161,7 @@ def theo_doi_tinh_trang_view(request):
         VanBanDi.TrangThai.DA_BAN_HANH,
     ]
     context = {
-        "page_title": "Theo doi tinh trang",
+        "page_title": "Theo dõi tình trạng",
         "active_menu": "follow_condition",
         "dashboard_cards": [
             {
@@ -990,6 +1186,22 @@ def theo_doi_tinh_trang_view(request):
             },
         ],
     }
+    context["dashboard_cards"][0]["title"] = "Văn bản đến"
+    context["dashboard_cards"][0]["items"] = build_status_count_items(
+        VanBanDen.objects.all(),
+        "trang_thai_vb_den",
+        incoming_statuses,
+        VanBanDen.TrangThai,
+    )
+    context["dashboard_cards"][1]["title"] = "Văn bản đi"
+    context["dashboard_cards"][1]["items"] = build_status_count_items(
+        VanBanDi.objects.all(),
+        "trang_thai_vb_di",
+        outgoing_statuses,
+        VanBanDi.TrangThai,
+    )
+    context["dashboard_cards"][2]["title"] = "Loại văn bản"
+    context["dashboard_cards"][3]["title"] = "Văn bản ưu tiên"
     return render(request, "theo_doi_tinh_trang.html", context)
 
 
@@ -1003,7 +1215,10 @@ def dang_ky_van_ban_den_view(request):
     if denied_response:
         return denied_response
     if request.method == "POST":
-        form = VanBanDenForm(request.POST, request.FILES)
+        form = VanBanDenForm(
+            request.POST,
+            request.FILES,
+        )
         if form.is_valid():
             van_ban_den = form.save()
             nguoi_phan_cong = giao_vien
@@ -1047,16 +1262,21 @@ def danh_sach_van_ban_den_view(request):
     )
     for document in documents:
         document.status_css_class = get_van_ban_den_status_class(document.trang_thai_vb_den)
+        document.trang_thai_hien_thi = get_van_ban_den_status_label(document.trang_thai_vb_den)
+        document.attachments_json = serialize_attachment_json(serialize_incoming_attachments(document))
 
     context = {
         "page_title": "Danh sach van ban den",
         "active_menu": "incoming_text",
         "documents": documents,
-        "document_status_choices": [
-            VanBanDen.TrangThai.CHO_PHAN_CONG,
-            VanBanDen.TrangThai.CHO_XU_LY,
-            VanBanDen.TrangThai.DA_HOAN_THANH,
-        ],
+        "document_status_choices": build_choice_options(
+            VanBanDen.TrangThai,
+            [
+                VanBanDen.TrangThai.CHO_PHAN_CONG,
+                VanBanDen.TrangThai.CHO_XU_LY,
+                VanBanDen.TrangThai.DA_HOAN_THANH,
+            ],
+        ),
         "loai_van_ban_list": LoaiVanBan.objects.filter(ap_dung__in=[1, 2]).order_by("ten_loai_vb"),
         "muc_do_list": MucDoUuTien.objects.order_by("muc_do"),
         "can_manage_documents": giao_vien is None or is_van_thu(giao_vien),
@@ -1080,20 +1300,30 @@ def danh_sach_van_ban_di_view(request):
     )
     for document in documents:
         document.status_css_class = get_van_ban_di_status_class(document.trang_thai_vb_di)
+        document.trang_thai_hien_thi = get_van_ban_di_status_label(document.trang_thai_vb_di)
         document.nguoi_ky_hien_thi = get_document_signers_display(document)
+        document.ban_du_thao_attachments_json = serialize_attachment_json(
+            serialize_outgoing_supporting_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+        )
+        document.ban_chinh_thuc_attachments_json = serialize_attachment_json(
+            serialize_outgoing_supporting_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+        )
 
     context = {
         "page_title": "Danh sach van ban di",
         "active_menu": "outgoing_text",
         "documents": documents,
-        "document_status_choices": [
-            VanBanDi.TrangThai.DU_THAO,
-            VanBanDi.TrangThai.CHO_DUYET,
-            VanBanDi.TrangThai.DANG_CHINH_SUA,
-            VanBanDi.TrangThai.CHO_DANG_KY,
-            VanBanDi.TrangThai.DA_DANG_KY,
-            VanBanDi.TrangThai.DA_HOAN_THANH,
-        ],
+        "document_status_choices": build_choice_options(
+            VanBanDi.TrangThai,
+            [
+                VanBanDi.TrangThai.DU_THAO,
+                VanBanDi.TrangThai.CHO_DUYET,
+                VanBanDi.TrangThai.DANG_CHINH_SUA,
+                VanBanDi.TrangThai.CHO_DANG_KY,
+                VanBanDi.TrangThai.DA_DANG_KY,
+                VanBanDi.TrangThai.DA_HOAN_THANH,
+            ],
+        ),
         "loai_van_ban_list": LoaiVanBan.objects.filter(ap_dung__in=[0, 2]).order_by("ten_loai_vb"),
         "muc_do_list": MucDoUuTien.objects.order_by("muc_do"),
         "giao_vien_list": GiaoVien.objects.order_by("ho_ten"),
@@ -1114,7 +1344,12 @@ def dang_ky_van_ban_di_tu_danh_muc_view(request):
     document = build_manual_outgoing_registration_document(so_vb_di=next_so_vb_di, trang_thai=VanBanDi.TrangThai.CHO_DANG_KY)
 
     if request.method == "POST":
-        form = VanBanDiDangKyForm(request.POST, request.FILES, create_mode=True, giao_vien=giao_vien)
+        form = VanBanDiDangKyForm(
+            request.POST,
+            copy_request_files_with_aliases(request, {"ban_chinh_thuc_uploads": "ban_chinh_thuc"}),
+            create_mode=True,
+            giao_vien=giao_vien,
+        )
         if form.is_valid():
             registered_document = form.save(commit=False)
             if not registered_document.ngay_ban_hanh:
@@ -1126,6 +1361,7 @@ def dang_ky_van_ban_di_tu_danh_muc_view(request):
             registered_document.so_ky_hieu = so_ky_hieu
             registered_document.trang_thai_vb_di = VanBanDi.TrangThai.DA_DANG_KY
             registered_document.save()
+            form.save_uploaded_files(registered_document)
             messages.success(request, f"Da dang ky van ban di {registered_document.so_vb_di}.")
             return redirect("dang_ky_van_ban_di", so_vb_di=registered_document.so_vb_di)
     else:
@@ -1152,7 +1388,11 @@ def tao_van_ban_view(request):
     if denied_response:
         return denied_response
     if request.method == "POST":
-        form = TaoVanBanDiForm(request.POST, request.FILES, giao_vien=giao_vien)
+        form = TaoVanBanDiForm(
+            request.POST,
+            copy_request_files_with_aliases(request, {"ban_du_thao_uploads": "ban_du_thao"}),
+            giao_vien=giao_vien,
+        )
         if form.is_valid():
             van_ban_di = form.save(commit=False)
             hieu_truong = get_hieu_truong()
@@ -1162,6 +1402,7 @@ def tao_van_ban_view(request):
             else:
                 van_ban_di.nguoi_ky = hieu_truong or nguoi_duyet_dau_tien
                 van_ban_di.save()
+                form.save_uploaded_files(van_ban_di)
                 if (
                     (is_truong_bo_mon(giao_vien) or is_phong_ban_to_chuc(giao_vien))
                     and van_ban_di.ma_loai_vb.twocap == LoaiVanBan.TWO_CAP_HAI_CAP
@@ -1340,18 +1581,19 @@ def can_phan_cong_view(request):
                 "priority_rank": get_priority_rank(document.ma_muc_do.muc_do),
                 "thoi_gian": document.ngay_nhan if loai == "den" else document.ngay_ky,
                 "file_name": (
-                    document.file_van_ban.name.split("/")[-1]
-                    if loai == "den" and document.file_van_ban
-                    else document.ban_chinh_thuc.name.split("/")[-1]
-                    if loai == "di" and document.ban_chinh_thuc
-                    else ""
+                    build_primary_file_payload(document.file_van_ban)["name"]
+                    if loai == "den"
+                    else build_primary_file_payload(document.ban_chinh_thuc)["name"]
                 ),
                 "file_url": (
-                    document.file_van_ban.url
-                    if loai == "den" and document.file_van_ban
-                    else document.ban_chinh_thuc.url
-                    if loai == "di" and document.ban_chinh_thuc
-                    else ""
+                    build_primary_file_payload(document.file_van_ban)["url"]
+                    if loai == "den"
+                    else build_primary_file_payload(document.ban_chinh_thuc)["url"]
+                ),
+                "attachments_json": serialize_attachment_json(
+                    serialize_incoming_attachments(document)
+                    if loai == "den"
+                    else serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
                 ),
                 "noi_dung_cd": assignment.noi_dung_cd,
                 "thoi_han": assignment.thoi_han.strftime("%Y-%m-%d") if assignment.thoi_han else "",
@@ -1495,22 +1737,26 @@ def build_personal_processing_documents(giao_vien):
                 "thoi_han": assignment.thoi_han.strftime("%Y-%m-%d") if assignment.thoi_han else "",
                 "trang_thai_xl": assignment.trang_thai_xl,
                 "file_name": (
-                    document.file_van_ban.name.split("/")[-1]
-                    if is_incoming and document.file_van_ban
-                    else document.ban_chinh_thuc.name.split("/")[-1]
-                    if not is_incoming and document.ban_chinh_thuc
-                    else document.ban_du_thao.name.split("/")[-1]
-                    if not is_incoming and document.ban_du_thao
-                    else ""
+                    build_primary_file_payload(document.file_van_ban)["name"]
+                    if is_incoming
+                    else (
+                        build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["name"]
+                    )
                 ),
                 "file_url": (
-                    document.file_van_ban.url
-                    if is_incoming and document.file_van_ban
-                    else document.ban_chinh_thuc.url
-                    if not is_incoming and document.ban_chinh_thuc
-                    else document.ban_du_thao.url
-                    if not is_incoming and document.ban_du_thao
-                    else ""
+                    build_primary_file_payload(document.file_van_ban)["url"]
+                    if is_incoming
+                    else (
+                        build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["url"]
+                    )
+                ),
+                "attachments_json": serialize_attachment_json(
+                    serialize_incoming_attachments(document)
+                    if is_incoming
+                    else (
+                        serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+                        or serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+                    )
                 ),
             }
         )
@@ -1553,8 +1799,9 @@ def build_published_documents():
                 "nguon": "Van ban den",
                 "co_quan_ban_hanh": document.co_quan_ban_hanh,
                 "trang_thai": "Da ban hanh noi bo",
-                "file_name": document.file_van_ban.name.split("/")[-1] if document.file_van_ban else "",
-                "file_url": document.file_van_ban.url if document.file_van_ban else "",
+                "file_name": build_primary_file_payload(document.file_van_ban)["name"],
+                "file_url": build_primary_file_payload(document.file_van_ban)["url"],
+                "attachments_json": serialize_attachment_json(serialize_incoming_attachments(document)),
                 "edit_url": reverse("danh_sach_van_ban_den"),
             }
         )
@@ -1578,19 +1825,11 @@ def build_published_documents():
                 "nguon": "Van ban di",
                 "co_quan_ban_hanh": getattr(settings, "DON_VI_CAP_SO_VAN_BAN", "THPTND"),
                 "trang_thai": "Da ban hanh noi bo",
-                "file_name": (
-                    document.ban_chinh_thuc.name.split("/")[-1]
-                    if document.ban_chinh_thuc
-                    else document.ban_du_thao.name.split("/")[-1]
-                    if document.ban_du_thao
-                    else ""
-                ),
-                "file_url": (
-                    document.ban_chinh_thuc.url
-                    if document.ban_chinh_thuc
-                    else document.ban_du_thao.url
-                    if document.ban_du_thao
-                    else ""
+                "file_name": build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["name"],
+                "file_url": build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["url"],
+                "attachments_json": serialize_attachment_json(
+                    serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+                    or serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
                 ),
                 "edit_url": reverse("danh_sach_van_ban_di"),
             }
@@ -1632,8 +1871,11 @@ def build_created_documents(giao_vien):
                 "nguon": "Van ban di",
                 "co_quan_ban_hanh": getattr(settings, "DON_VI_CAP_SO_VAN_BAN", "THPTND"),
                 "trang_thai": document.trang_thai_vb_di,
-                "file_name": document.ban_du_thao.name.split("/")[-1] if document.ban_du_thao else "",
-                "file_url": document.ban_du_thao.url if document.ban_du_thao else "",
+                "file_name": build_primary_file_payload(document.ban_du_thao)["name"],
+                "file_url": build_primary_file_payload(document.ban_du_thao)["url"],
+                "attachments_json": serialize_attachment_json(
+                    serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+                ),
             }
         )
     return documents
@@ -1664,8 +1906,11 @@ def build_returned_documents(giao_vien):
                 "nguoi_yeu_cau": latest_revision.ma_nguoi_tao.ho_ten,
                 "noi_dung_yeu_cau": latest_revision.yc_chinh_sua,
                 "trang_thai": latest_revision.trang_thai,
-                "file_name": document.ban_du_thao.name.split("/")[-1] if document.ban_du_thao else "",
-                "file_url": document.ban_du_thao.url if document.ban_du_thao else "",
+                "file_name": build_primary_file_payload(document.ban_du_thao)["name"],
+                "file_url": build_primary_file_payload(document.ban_du_thao)["url"],
+                "attachments_json": serialize_attachment_json(
+                    serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+                ),
             }
         )
     return documents
@@ -1673,34 +1918,21 @@ def build_returned_documents(giao_vien):
 
 def build_external_published_documents():
     documents = []
-    outgoing_documents = (
-        annotate_priority_order(
-            VanBanDi.objects.filter(da_phat_hanh_ben_ngoai=True, luan_chuyen_ben_ngoais__isnull=False)
+    external_records = (
+        LuanChuyenBenNgoai.objects.select_related(
+            "ma_vb_di",
+            "ma_vb_di__ma_loai_vb",
+            "ma_noi_nhan",
+            "nguoi_thuc_hien",
         )
-        .select_related("ma_loai_vb", "ma_muc_do", "nguoi_tao", "nguoi_ky")
-        .prefetch_related("luan_chuyen_ben_ngoais__ma_noi_nhan")
-        .distinct()
-        .order_by("priority_rank", "-ngay_ban_hanh", "-so_vb_di")
+        .order_by("-thoi_gian_gui", "-ma_luan_chuyen")
     )
-    for index, document in enumerate(outgoing_documents, start=1):
-        recipients = [
-            {
-                "ten_noi_nhan": item.ma_noi_nhan.ten_noi_nhan,
-                "dia_chi": item.ma_noi_nhan.dia_chi,
-                "so_dien_thoai": item.ma_noi_nhan.so_dien_thoai,
-                "gmail": item.ma_noi_nhan.gmail,
-                "thong_tin_khac": item.ma_noi_nhan.thong_tin_khac,
-                "thoi_gian_gui": timezone.localtime(item.thoi_gian_gui).strftime("%d/%m/%Y %H:%M")
-                if item.thoi_gian_gui
-                else "",
-                "trang_thai_gui": item.trang_thai_gui,
-            }
-            for item in document.luan_chuyen_ben_ngoais.all()
-        ]
+    for index, record in enumerate(external_records, start=1):
+        document = record.ma_vb_di
         documents.append(
             {
                 "stt": index,
-                "record_id": document.pk,
+                "record_id": record.pk,
                 "so_van_ban": document.so_vb_di,
                 "ngay_ban_hanh_display": (
                     (document.ngay_ban_hanh or document.ngay_ky).strftime("%d/%m/%Y")
@@ -1710,23 +1942,23 @@ def build_external_published_documents():
                 "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
                 "so_ky_hieu": document.so_ky_hieu,
                 "trich_yeu": document.trich_yeu,
-                "trang_thai": "Da phat hanh ben ngoai",
-                "noi_nhan_tong_hop": ", ".join(item["ten_noi_nhan"] for item in recipients),
-                "file_name": (
-                    document.ban_chinh_thuc.name.split("/")[-1]
-                    if document.ban_chinh_thuc
-                    else document.ban_du_thao.name.split("/")[-1]
-                    if document.ban_du_thao
+                "trang_thai": record.trang_thai_gui,
+                "noi_nhan_tong_hop": record.ma_noi_nhan.ten_noi_nhan,
+                "nguoi_thuc_hien": record.nguoi_thuc_hien.ho_ten,
+                "nguoi_thuc_hien_id": record.nguoi_thuc_hien_id,
+                "ghi_chu": record.ghi_chu,
+                "ma_noi_nhan": record.ma_noi_nhan_id,
+                "thoi_gian_gui": (
+                    timezone.localtime(record.thoi_gian_gui).strftime("%d/%m/%Y %H:%M")
+                    if record.thoi_gian_gui
                     else ""
                 ),
-                "file_url": (
-                    document.ban_chinh_thuc.url
-                    if document.ban_chinh_thuc
-                    else document.ban_du_thao.url
-                    if document.ban_du_thao
-                    else ""
+                "file_name": build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["name"],
+                "file_url": build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["url"],
+                "attachments_json": serialize_attachment_json(
+                    serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+                    or serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
                 ),
-                "recipients_json": json.dumps(recipients, ensure_ascii=True),
             }
         )
     return documents
@@ -1815,6 +2047,7 @@ def van_ban_phat_hanh_ben_ngoai_view(request):
         "page_title": "Phat hanh ben ngoai",
         "active_menu": "outgoing_text",
         "documents": build_external_published_documents(),
+        "recipient_list": NoiNhan.objects.order_by("ten_noi_nhan"),
         "is_external_published_list": True,
     }
     return render(request, "van_ban_phat_hanh_ben_ngoai.html", context)
@@ -1901,7 +2134,7 @@ def hoan_thanh_chinh_sua_van_ban_view(request, so_vb_di):
 
     trich_yeu = request.POST.get("trich_yeu", "").strip()
     ma_loai_vb_id = request.POST.get("ma_loai_vb", "").strip()
-    uploaded_file = request.FILES.get("ban_du_thao")
+    uploaded_files = request.FILES.getlist("ban_du_thao")
 
     if not trich_yeu:
         return JsonResponse({"success": False, "message": "Vui long nhap trich yeu van ban."}, status=400)
@@ -1911,12 +2144,30 @@ def hoan_thanh_chinh_sua_van_ban_view(request, so_vb_di):
     loai_van_ban = get_object_or_404(LoaiVanBan.objects.filter(ap_dung__in=[0, 2]), pk=ma_loai_vb_id)
     document.trich_yeu = trich_yeu
     document.ma_loai_vb = loai_van_ban
-    if uploaded_file is not None:
-        if document.ban_du_thao:
-            document.ban_du_thao.delete(save=False)
-        document.ban_du_thao = uploaded_file
+    if uploaded_files:
+        document.ban_du_thao = uploaded_files[0]
     document.trang_thai_vb_di = VanBanDi.TrangThai.CHO_DUYET
     document.save()
+    if uploaded_files:
+        start_index = document.tep_dinh_kem_dis.filter(loai_tep=TepDinhKemVanBanDi.LoaiTep.DU_THAO).count()
+        if not document.tep_dinh_kem_dis.filter(
+            loai_tep=TepDinhKemVanBanDi.LoaiTep.DU_THAO,
+            tep_tin=document.ban_du_thao.name,
+        ).exists():
+            TepDinhKemVanBanDi.objects.create(
+                so_vb_di=document,
+                loai_tep=TepDinhKemVanBanDi.LoaiTep.DU_THAO,
+                tep_tin=document.ban_du_thao.name,
+                thu_tu=start_index,
+            )
+            start_index += 1
+        for offset, uploaded_file in enumerate(uploaded_files[1:], start=start_index):
+            TepDinhKemVanBanDi.objects.create(
+                so_vb_di=document,
+                loai_tep=TepDinhKemVanBanDi.LoaiTep.DU_THAO,
+                tep_tin=uploaded_file,
+                thu_tu=offset,
+            )
     latest_revision.trang_thai = NhatKyVanBan.TrangThai.DA_CHINH_SUA
     latest_revision.save(update_fields=["trang_thai"])
     document.xu_lys.filter(trang_thai_ky=XuLy.TRANG_THAI_CHO_CHINH_SUA).update(
@@ -2168,6 +2419,7 @@ def duyet_van_ban_di_action_view(request, so_vb_di):
                 "document": {
                     "so_vb_di": document.so_vb_di,
                     "trang_thai_vb_di": document.trang_thai_vb_di,
+                    "trang_thai_hien_thi": get_van_ban_di_status_label(document.trang_thai_vb_di),
                     "status_class": get_van_ban_di_status_class(document.trang_thai_vb_di),
                 },
             }
@@ -2230,6 +2482,7 @@ def duyet_van_ban_di_action_view(request, so_vb_di):
             "document": {
                 "so_vb_di": document.so_vb_di,
                 "trang_thai_vb_di": document.trang_thai_vb_di,
+                "trang_thai_hien_thi": get_van_ban_di_status_label(document.trang_thai_vb_di),
                 "status_class": get_van_ban_di_status_class(document.trang_thai_vb_di),
             },
         }
@@ -2323,7 +2576,12 @@ def dang_ky_van_ban_di_view(request, so_vb_di):
             messages.error(request, "Van ban nay khong o trang thai cho dang ky.")
             return redirect("dang_ky_van_ban_di", so_vb_di=document.so_vb_di)
 
-        form = VanBanDiDangKyForm(request.POST, request.FILES, instance=document, editable=can_register)
+        form = VanBanDiDangKyForm(
+            request.POST,
+            request.FILES,
+            instance=document,
+            editable=can_register,
+        )
         if form.is_valid():
             registered_document = form.save(commit=False)
             if not registered_document.ngay_ban_hanh:
@@ -2333,6 +2591,7 @@ def dang_ky_van_ban_di_view(request, so_vb_di):
             registered_document.so_ky_hieu = so_ky_hieu
             registered_document.trang_thai_vb_di = VanBanDi.TrangThai.DA_DANG_KY
             registered_document.save()
+            form.save_uploaded_files(registered_document)
             messages.success(request, f"Da dang ky van ban di {registered_document.so_vb_di}.")
             return redirect("dang_ky_van_ban_di", so_vb_di=registered_document.so_vb_di)
     else:
@@ -2427,6 +2686,7 @@ def luan_chuyen_van_ban_di_view(request, so_vb_di):
             "document": {
                 "so_vb_di": document.so_vb_di,
                 "trang_thai_vb_di": document.trang_thai_vb_di,
+                "trang_thai_hien_thi": get_van_ban_di_status_label(document.trang_thai_vb_di),
                 "status_class": get_van_ban_di_status_class(document.trang_thai_vb_di),
             },
         }
@@ -2474,17 +2734,25 @@ def cap_nhat_van_ban_den_view(request, so_vb_den):
         return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
 
     normalized_status = normalize_text(van_ban_den.trang_thai_vb_den)
+    has_attachment_changes = bool(
+        request.FILES.getlist("tep_dinh_kem_uploads")
+        or request.POST.get("tep_dinh_kem_xoa_ids", "").strip()
+    )
     if normalized_status in {
         normalize_text(VanBanDen.TrangThai.CHO_XU_LY),
         normalize_text(VanBanDen.TrangThai.DA_HOAN_THANH),
         normalize_text(VanBanDen.TrangThai.DA_BAN_HANH),
-    }:
+    } and not has_attachment_changes:
         return JsonResponse(
             {"success": False, "message": "Van ban den da duoc phan cong thi khong con duoc chinh sua."},
             status=400,
         )
 
-    form = VanBanDenUpdateForm(request.POST, request.FILES, instance=van_ban_den)
+    form = VanBanDenUpdateForm(
+        request.POST,
+        copy_request_files_with_aliases(request, {"file_van_ban_uploads": "file_van_ban"}),
+        instance=van_ban_den,
+    )
     if not form.is_valid():
         return JsonResponse({"success": False, "errors": form.errors}, status=400)
 
@@ -2511,11 +2779,23 @@ def cap_nhat_van_ban_di_view(request, so_vb_di):
     if request.method != "POST":
         return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
 
-    form = VanBanDiUpdateForm(request.POST, request.FILES, instance=van_ban_di)
+    form = VanBanDiUpdateForm(
+        request.POST,
+        copy_request_files_with_aliases(
+            request,
+            {
+                "ban_du_thao_uploads": "ban_du_thao",
+                "ban_chinh_thuc_uploads": "ban_chinh_thuc",
+            },
+        ),
+        instance=van_ban_di,
+    )
     if not form.is_valid():
         return JsonResponse({"success": False, "errors": form.errors}, status=400)
 
     updated_document = form.save()
+    draft_attachments = serialize_outgoing_attachments(updated_document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+    official_attachments = serialize_outgoing_attachments(updated_document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
     return JsonResponse(
         {
             "success": True,
@@ -2530,6 +2810,7 @@ def cap_nhat_van_ban_di_view(request, so_vb_di):
                 "trich_yeu": updated_document.trich_yeu,
                 "noi_nhan": updated_document.noi_nhan,
                 "trang_thai_vb_di": updated_document.trang_thai_vb_di,
+                "trang_thai_hien_thi": get_van_ban_di_status_label(updated_document.trang_thai_vb_di),
                 "status_class": get_van_ban_di_status_class(updated_document.trang_thai_vb_di),
                 "ten_loai_vb": updated_document.ma_loai_vb.ten_loai_vb,
                 "muc_do": updated_document.ma_muc_do.muc_do,
@@ -2537,12 +2818,16 @@ def cap_nhat_van_ban_di_view(request, so_vb_di):
                 "nguoi_ky": updated_document.nguoi_ky.ho_ten,
                 "nguoi_ky_display": get_document_signers_display(updated_document),
                 "nguoi_ky_id": updated_document.nguoi_ky_id,
-                "ban_du_thao_name": updated_document.ban_du_thao.name.split("/")[-1] if updated_document.ban_du_thao else "",
-                "ban_du_thao_url": updated_document.ban_du_thao.url if updated_document.ban_du_thao else "",
-                "ban_chinh_thuc_name": (
-                    updated_document.ban_chinh_thuc.name.split("/")[-1] if updated_document.ban_chinh_thuc else ""
+                "ban_du_thao_name": build_primary_file_payload(updated_document.ban_du_thao)["name"],
+                "ban_du_thao_url": build_primary_file_payload(updated_document.ban_du_thao)["url"],
+                "ban_du_thao_attachments_json": serialize_attachment_json(
+                    serialize_outgoing_supporting_attachments(updated_document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
                 ),
-                "ban_chinh_thuc_url": updated_document.ban_chinh_thuc.url if updated_document.ban_chinh_thuc else "",
+                "ban_chinh_thuc_name": build_primary_file_payload(updated_document.ban_chinh_thuc)["name"],
+                "ban_chinh_thuc_url": build_primary_file_payload(updated_document.ban_chinh_thuc)["url"],
+                "ban_chinh_thuc_attachments_json": serialize_attachment_json(
+                    serialize_outgoing_supporting_attachments(updated_document, TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+                ),
             },
         }
     )
@@ -2571,25 +2856,28 @@ def phat_hanh_ben_ngoai_van_ban_di_view(request, so_vb_di):
     recipient_ids = [item.strip() for item in recipient_ids if item.strip()]
     if not recipient_ids:
         return JsonResponse({"success": False, "message": "Vui long chon it nhat mot noi nhan."}, status=400)
+    ghi_chu = request.POST.get("ghi_chu", "").strip()
 
     recipients = list(NoiNhan.objects.filter(pk__in=recipient_ids).order_by("ten_noi_nhan"))
     if len(recipients) != len(set(recipient_ids)):
         return JsonResponse({"success": False, "message": "Danh sach noi nhan khong hop le."}, status=400)
 
-    created_recipients = []
+    created_records = []
     for recipient in recipients:
-        _, created = LuanChuyenBenNgoai.objects.get_or_create(
+        record, created = LuanChuyenBenNgoai.objects.get_or_create(
             ma_vb_di=document,
             ma_noi_nhan=recipient,
             defaults={
                 "nguoi_thuc_hien": giao_vien,
-                "trang_thai_gui": LuanChuyenBenNgoai.TrangThaiGui.DA_GUI,
+                "trang_thai_gui": LuanChuyenBenNgoai.TrangThaiGui.CHO_GUI,
+                "ghi_chu": ghi_chu,
+                "thoi_gian_gui": None,
             },
         )
         if created:
-            created_recipients.append(recipient.ten_noi_nhan)
+            created_records.append(record)
 
-    if not created_recipients:
+    if not created_records:
         return JsonResponse(
             {"success": False, "message": "Van ban nay da duoc phat hanh den cac noi nhan da chon."},
             status=400,
@@ -2601,8 +2889,84 @@ def phat_hanh_ben_ngoai_van_ban_di_view(request, so_vb_di):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da phat hanh ben ngoai van ban {document.so_vb_di}.",
-            "recipients": created_recipients,
+            "message": f"Da tao {len(created_records)} ban ghi phat hanh ben ngoai cho van ban {document.so_vb_di}.",
+            "records": [serialize_external_dispatch_record(record) for record in created_records],
+        }
+    )
+
+
+@login_required
+def cap_nhat_luan_chuyen_ben_ngoai_view(request, ma_luan_chuyen):
+    giao_vien = getattr(request.user, "ho_so_giao_vien", None)
+    denied_response = deny_if_no_permission(
+        request,
+        allowed=(giao_vien is None or is_van_thu(giao_vien)),
+    )
+    if denied_response:
+        return JsonResponse({"success": False, "message": "Ban khong co quyen cap nhat phat hanh ben ngoai."}, status=403)
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+
+    record = get_object_or_404(
+        LuanChuyenBenNgoai.objects.select_related("ma_vb_di", "ma_vb_di__ma_loai_vb", "ma_noi_nhan", "nguoi_thuc_hien"),
+        pk=ma_luan_chuyen,
+    )
+    if record.trang_thai_gui == LuanChuyenBenNgoai.TrangThaiGui.DA_GUI:
+        return JsonResponse({"success": False, "message": "Ban ghi nay da duoc danh dau da gui."}, status=400)
+
+    ma_noi_nhan = request.POST.get("ma_noi_nhan", "").strip()
+    if not ma_noi_nhan:
+        return JsonResponse({"success": False, "message": "Vui long chon noi nhan."}, status=400)
+    recipient = get_object_or_404(NoiNhan, pk=ma_noi_nhan)
+    duplicate_record = (
+        LuanChuyenBenNgoai.objects.exclude(pk=record.pk)
+        .filter(ma_vb_di=record.ma_vb_di, ma_noi_nhan=recipient)
+        .exists()
+    )
+    if duplicate_record:
+        return JsonResponse({"success": False, "message": "Van ban nay da co ban ghi cho noi nhan da chon."}, status=400)
+
+    record.ma_noi_nhan = recipient
+    record.ghi_chu = request.POST.get("ghi_chu", "").strip()
+    record.save(update_fields=["ma_noi_nhan", "ghi_chu"])
+    record = LuanChuyenBenNgoai.objects.select_related("ma_vb_di", "ma_vb_di__ma_loai_vb", "ma_noi_nhan", "nguoi_thuc_hien").get(pk=record.pk)
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Da cap nhat thong tin phat hanh ben ngoai.",
+            "record": serialize_external_dispatch_record(record),
+        }
+    )
+
+
+@login_required
+def danh_dau_da_gui_luan_chuyen_ben_ngoai_view(request, ma_luan_chuyen):
+    giao_vien = getattr(request.user, "ho_so_giao_vien", None)
+    denied_response = deny_if_no_permission(
+        request,
+        allowed=(giao_vien is None or is_van_thu(giao_vien)),
+    )
+    if denied_response:
+        return JsonResponse({"success": False, "message": "Ban khong co quyen cap nhat phat hanh ben ngoai."}, status=403)
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+
+    record = get_object_or_404(
+        LuanChuyenBenNgoai.objects.select_related("ma_vb_di", "ma_vb_di__ma_loai_vb", "ma_noi_nhan", "nguoi_thuc_hien"),
+        pk=ma_luan_chuyen,
+    )
+    if record.trang_thai_gui == LuanChuyenBenNgoai.TrangThaiGui.DA_GUI:
+        return JsonResponse({"success": False, "message": "Ban ghi nay da duoc danh dau da gui."}, status=400)
+
+    record.trang_thai_gui = LuanChuyenBenNgoai.TrangThaiGui.DA_GUI
+    record.thoi_gian_gui = timezone.now()
+    record.save(update_fields=["trang_thai_gui", "thoi_gian_gui"])
+    record = LuanChuyenBenNgoai.objects.select_related("ma_vb_di", "ma_vb_di__ma_loai_vb", "ma_noi_nhan", "nguoi_thuc_hien").get(pk=record.pk)
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Da danh dau ban ghi la da gui.",
+            "record": serialize_external_dispatch_record(record),
         }
     )
 
@@ -2784,6 +3148,50 @@ def them_giao_vien_view(request):
             "row_html": serialize_teacher_row_html(request, giao_vien_moi),
         }
     )
+
+
+@login_required
+def cap_nhat_ho_so_ca_nhan_view(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+
+    giao_vien = getattr(request.user, "ho_so_giao_vien", None)
+    if giao_vien is None:
+        return JsonResponse({"success": False, "message": "Tai khoan hien tai chua co ho so giao vien."}, status=400)
+
+    form = HoSoCaNhanForm(request.POST, instance=giao_vien)
+    if not form.is_valid():
+        return JsonResponse({"success": False, "errors": form.errors}, status=400)
+
+    giao_vien = form.save()
+    giao_vien = (
+        GiaoVien.objects.select_related("ma_to", "user")
+        .prefetch_related("user__groups")
+        .get(pk=giao_vien.pk)
+    )
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Da cap nhat thong tin ca nhan.",
+            "profile": serialize_personal_profile(giao_vien),
+        }
+    )
+
+
+@login_required
+def doi_mat_khau_ca_nhan_view(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+
+    form = DoiMatKhauCaNhanForm(request.POST, user=request.user)
+    if not form.is_valid():
+        errors = form.errors.get("__all__") or sum(form.errors.values(), [])
+        return JsonResponse({"success": False, "message": " ".join(errors)}, status=400)
+
+    request.user.set_password(form.cleaned_data["mat_khau_moi"])
+    request.user.save(update_fields=["password"])
+    update_session_auth_hash(request, request.user)
+    return JsonResponse({"success": True, "message": "Da doi mat khau thanh cong."})
 
 
 @login_required

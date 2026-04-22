@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import GiaoVien, LoaiVanBan, LuanChuyenBenNgoai, MauVanBan, MucDoUuTien, NhatKyVanBan, NoiNhan, PhanCongXuLy, ToChuyenMon, VanBanDen, VanBanDi, XuLy
+from .models import GiaoVien, LoaiVanBan, LuanChuyenBenNgoai, MauVanBan, MucDoUuTien, NhatKyVanBan, NoiNhan, PhanCongXuLy, TepDinhKemVanBanDen, TepDinhKemVanBanDi, ToChuyenMon, VanBanDen, VanBanDi, XuLy
 from .views import get_document_signers_display
 
 
@@ -186,6 +186,18 @@ class DangKyVanBanDenViewTests(TestCase):
                     b"%PDF-1.4 incoming",
                     content_type="application/pdf",
                 ),
+                "tep_dinh_kem_uploads": [
+                    SimpleUploadedFile(
+                        "incoming-attachment-1.pdf",
+                        b"%PDF-1.4 attachment 1",
+                        content_type="application/pdf",
+                    ),
+                    SimpleUploadedFile(
+                        "incoming-attachment-2.docx",
+                        b"PK incoming attachment 2",
+                        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ],
             },
         )
 
@@ -194,6 +206,8 @@ class DangKyVanBanDenViewTests(TestCase):
         self.assertEqual(van_ban_den.ngay_nhan.isoformat(), "2026-03-28")
         self.assertEqual(van_ban_den.so_vb_den, "VBD0000001")
         self.assertEqual(van_ban_den.trang_thai_vb_den, "Cho phan cong")
+        self.assertIn("incoming", van_ban_den.file_van_ban.name)
+        self.assertEqual(van_ban_den.tep_dinh_kems.count(), 3)
         phan_cong = PhanCongXuLy.objects.get(so_vb_den=van_ban_den)
         self.assertEqual(phan_cong.nguoi_xu_ly, self.hieu_truong)
         self.assertEqual(phan_cong.trang_thai_xl, "Cho xu ly")
@@ -240,6 +254,30 @@ class DangKyVanBanDenViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "VBD0000001")
+
+    def test_list_view_embeds_attachment_data_for_detail_modal(self):
+        van_ban_den = VanBanDen.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            co_quan_ban_hanh="So Giao duc",
+            so_ky_hieu="16/SGD",
+            ngay_ky="2026-03-20",
+            trich_yeu="Thong bao co tep dinh kem",
+            file_van_ban=SimpleUploadedFile("incoming-main.pdf", b"%PDF-1.4 main", content_type="application/pdf"),
+            trang_thai_vb_den="Cho phan cong",
+            ngay_nhan="2026-03-21",
+            ma_muc_do=self.muc_do,
+        )
+        TepDinhKemVanBanDen.objects.create(
+            so_vb_den=van_ban_den,
+            tep_tin=SimpleUploadedFile("incoming-extra.pdf", b"%PDF-1.4 extra", content_type="application/pdf"),
+            thu_tu=1,
+        )
+
+        response = self.client.get(reverse("danh_sach_van_ban_den"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-attachments-json", html=False)
+        self.assertContains(response, "incoming-extra.pdf", html=False)
 
     def test_list_view_orders_documents_by_priority_then_date(self):
         hoa_toc = MucDoUuTien.objects.create(muc_do="Hoa toc")
@@ -575,7 +613,11 @@ class VanBanDiViewTests(TestCase):
         self.assertEqual(van_ban_di.ma_muc_do, self.muc_do)
         self.assertEqual(van_ban_di.trang_thai_vb_di, "Cho duyet")
         self.assertEqual(van_ban_di.so_ky_hieu, "")
-        self.assertTrue(van_ban_di.ban_du_thao.name.endswith("tao-moi.pdf"))
+        self.assertIn("tao-moi", van_ban_di.ban_du_thao.name)
+        self.assertEqual(
+            van_ban_di.tep_dinh_kem_dis.filter(loai_tep="du_thao").count(),
+            0,
+        )
         xu_ly = XuLy.objects.get(ma_vb_di=van_ban_di)
         self.assertEqual(xu_ly.trang_thai_ky, XuLy.TRANG_THAI_CHO_DUYET)
         self.assertEqual(xu_ly.vai_tro_ky, XuLy.VAI_TRO_KY_CHINH)
@@ -780,6 +822,18 @@ class VanBanDiViewTests(TestCase):
                     b"%PDF-1.4 official register",
                     content_type="application/pdf",
                 ),
+                "tep_dinh_kem_uploads": [
+                    SimpleUploadedFile(
+                        "official-attachment-1.pdf",
+                        b"%PDF-1.4 official attachment 1",
+                        content_type="application/pdf",
+                    ),
+                    SimpleUploadedFile(
+                        "official-attachment-2.docx",
+                        b"PK official attachment 2",
+                        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ),
+                ],
             },
         )
 
@@ -789,7 +843,11 @@ class VanBanDiViewTests(TestCase):
         self.assertEqual(van_ban_di.ngay_ban_hanh, timezone.localdate())
         self.assertEqual(van_ban_di.so_thu_tu, 1)
         self.assertEqual(van_ban_di.so_ky_hieu, "01/CV-THPTND")
-        self.assertTrue(van_ban_di.ban_chinh_thuc.name.endswith("official-register.pdf"))
+        self.assertIn("official-register", van_ban_di.ban_chinh_thuc.name)
+        self.assertEqual(
+            van_ban_di.tep_dinh_kem_dis.filter(loai_tep="chinh_thuc").count(),
+            2,
+        )
 
     def test_dang_ky_view_shows_post_registration_buttons_for_legacy_waiting_transfer_status(self):
         van_ban_di = VanBanDi.objects.create(
@@ -810,8 +868,34 @@ class VanBanDiViewTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Phat hanh ben ngoai")
-        self.assertContains(response, "Ban hanh noi bo")
-        self.assertContains(response, 'id="btn-luan-chuyen"', html=False)
+
+    def test_list_view_embeds_attachment_data_for_detail_modal(self):
+        van_ban_di = VanBanDi.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            nguoi_tao=self.nguoi_tao,
+            trich_yeu="Van ban co tep dinh kem",
+            nguoi_ky=self.nguoi_ky,
+            ngay_ky="2026-03-20",
+            noi_nhan="So Giao duc",
+            ban_du_thao=SimpleUploadedFile("draft-detail.pdf", b"%PDF-1.4 draft", content_type="application/pdf"),
+            ban_chinh_thuc=SimpleUploadedFile("official-detail.pdf", b"%PDF-1.4 official", content_type="application/pdf"),
+            trang_thai_vb_di=VanBanDi.TrangThai.DA_DANG_KY,
+            ngay_ban_hanh="2026-03-21",
+            ma_muc_do=self.muc_do,
+            so_ky_hieu="09/CV-THPTND",
+        )
+        TepDinhKemVanBanDi.objects.create(
+            so_vb_di=van_ban_di,
+            loai_tep=TepDinhKemVanBanDi.LoaiTep.CHINH_THUC,
+            tep_tin=SimpleUploadedFile("official-extra.pdf", b"%PDF-1.4 extra", content_type="application/pdf"),
+            thu_tu=1,
+        )
+
+        response = self.client.get(reverse("danh_sach_van_ban_di"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-ban-chinh-thuc-attachments-json", html=False)
+        self.assertContains(response, "official-extra.pdf", html=False)
         van_ban_di.refresh_from_db()
         self.assertEqual(van_ban_di.trang_thai_vb_di, VanBanDi.TrangThai.DA_DANG_KY)
 

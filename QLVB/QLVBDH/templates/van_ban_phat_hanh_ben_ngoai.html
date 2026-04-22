@@ -24,7 +24,7 @@
         <div class="search-bar">
             <div class="search-input-wrapper">
                 <i class="bi bi-search search-icon"></i>
-                <input type="text" id="search-input" placeholder="Tim theo so van ban, so ky hieu, trich yeu, noi nhan...">
+                <input type="text" id="search-input" placeholder="Tìm kiếm theo số văn bản,Số ký hiệu, trích yếu, nơi nhận...">
             </div>
             <button class="btn-xem" type="button" id="search-button">Xem</button>
         </div>
@@ -36,7 +36,7 @@
                         <th>STT</th>
                         <th>Ngày ban hành</th>
                         <th>Số văn bản</th>
-                        <th>Loại vaăn bản</th>
+                        <th>Loại văn bản</th>
                         <th>Số ký hiệu</th>
                         <th>Trích yếu</th>
                         <th>Nơi nhận</th>
@@ -47,6 +47,8 @@
                     {% for document in documents %}
                         <tr
                             data-record-id="{{ document.record_id }}"
+                            data-update-url="{% url 'cap_nhat_luan_chuyen_ben_ngoai' document.record_id %}"
+                            data-mark-sent-url="{% url 'danh_dau_da_gui_luan_chuyen_ben_ngoai' document.record_id %}"
                             data-ngay-ban-hanh="{{ document.ngay_ban_hanh_display }}"
                             data-so-van-ban="{{ document.so_van_ban }}"
                             data-loai-vb="{{ document.ten_loai_vb }}"
@@ -54,9 +56,12 @@
                             data-trich-yeu="{{ document.trich_yeu }}"
                             data-noi-nhan="{{ document.noi_nhan_tong_hop }}"
                             data-trang-thai="{{ document.trang_thai }}"
+                            data-ma-noi-nhan="{{ document.ma_noi_nhan }}"
+                            data-nguoi-thuc-hien="{{ document.nguoi_thuc_hien }}"
+                            data-ghi-chu="{{ document.ghi_chu }}"
+                            data-thoi-gian-gui="{{ document.thoi_gian_gui }}"
                             data-file-name="{{ document.file_name }}"
                             data-file-url="{{ document.file_url }}"
-                            data-recipients="{{ document.recipients_json|escapejs }}"
                         >
                             <td class="text-center">{{ document.stt }}</td>
                             <td>{{ document.ngay_ban_hanh_display }}</td>
@@ -81,7 +86,10 @@
                 <span>CHI TIẾT VĂN BẢN PHÁT HÀNH BÊN NGOÀI</span>
                 <button type="button" class="close-btn" id="close-external-modal">&times;</button>
             </div>
-            <div class="modal-body">
+            <form class="modal-body" id="external-edit-form">
+                {% csrf_token %}
+                <input type="hidden" id="external-update-url">
+                <input type="hidden" id="external-mark-sent-url">
                 <div class="form-row">
                     <div class="form-group"><label>Số văn bản:</label><input type="text" id="e-so-van-ban" readonly></div>
                     <div class="form-group"><label>Ngày ban hành:</label><input type="text" id="e-ngay-ban-hanh" readonly></div>
@@ -91,6 +99,20 @@
                     <div class="form-group"><label>Số ký hiệu:</label><input type="text" id="e-so-ky-hieu" readonly></div>
                 </div>
                 <div class="form-group-full"><label>Trích yếu:</label><textarea id="e-trich-yeu" rows="3" readonly></textarea></div>
+                <div class="form-row">
+                    <div class="form-group"><label>Người thực hiện:</label><input type="text" id="e-nguoi-thuc-hien" readonly></div>
+                    <div class="form-group"><label>Thời gian gửi:</label><input type="text" id="e-thoi-gian-gui" readonly></div>
+                </div>
+                <div class="form-group-full">
+                    <label>Nơi nhận:</label>
+                    <input type="text" id="e-noi-nhan-display" readonly>
+                    <select id="e-noi-nhan" class="hidden">
+                        {% for recipient in recipient_list %}
+                            <option value="{{ recipient.pk }}">{{ recipient.ten_noi_nhan }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group-full"><label>Ghi chú:</label><textarea id="e-ghi-chu" rows="3" readonly></textarea></div>
                 <div class="form-group-full file-input">
                     <label>File văn bản:</label>
                     <div class="file-input-wrapper">
@@ -100,25 +122,16 @@
                         <span class="btn-icon"><i class="bi bi-download"></i></span>
                     </div>
                 </div>
-                <div class="progress-details-section">
-                    <div class="progress-section-title">NƠI NHẬN VĂN BẢN</div>
-                    <div class="table-responsive detail-table-wrapper">
-                        <table class="table-custom detail-table">
-                            <thead>
-                                <tr>
-                                    <th>Tên nơi nhận</th>
-                                    <th>Địa chỉ</th>
-                                    <th>SĐT</th>
-                                    <th>Gmail</th>
-                                    <th>Thông tin khác</th>
-                                    <th>Thời gian gửi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="external-recipient-body"></tbody>
-                        </table>
+                <div class="form-errors" id="external-form-errors"></div>
+                <div class="modal-footer" id="external-modal-actions">
+                    <button type="button" id="btn-external-edit" class="btn-primary">Chỉnh sửa</button>
+                    <div id="external-edit-actions" class="edit-actions hidden">
+                        <button type="submit" id="btn-external-save" class="btn-success">Lưu</button>
+                        <button type="button" id="btn-external-cancel" class="btn-danger">Hủy</button>
                     </div>
+                    <button type="button" id="btn-mark-sent" class="btn-success">Đã gửi</button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 {% endblock %}

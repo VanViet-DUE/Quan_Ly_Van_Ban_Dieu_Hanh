@@ -55,6 +55,18 @@
     background: transparent;
     color: #333;
 }
+.btn-xem {
+    background-color: #1b4e7b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0 24px;
+    height: 38px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
 
 .assignment-page {
     width: 100%;

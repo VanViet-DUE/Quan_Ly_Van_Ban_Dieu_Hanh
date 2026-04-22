@@ -356,7 +356,7 @@ class VanBanDen(models.Model):
     so_ky_hieu = models.CharField(max_length=15)
     ngay_ky = models.DateField()
     trich_yeu = models.CharField(max_length=500)
-    file_van_ban = models.FileField(upload_to="van_ban_den/")
+    file_van_ban = models.FileField(upload_to="van_ban_den/", null=True, blank=True)
     trang_thai_vb_den = models.CharField(max_length=100, default="Mới tiếp nhận")
     da_ban_hanh_noi_bo = models.BooleanField(default=False)
     ngay_nhan = models.DateField()
@@ -382,6 +382,12 @@ class VanBanDen(models.Model):
                 super().save(*args, **kwargs)
                 return
         super().save(*args, **kwargs)
+
+    def get_file_attachments(self):
+        return list(self.tep_dinh_kems.order_by("thu_tu", "ngay_tao", "ma_tep"))
+
+    def get_primary_file(self):
+        return self.file_van_ban
 
 
 class VanBanDi(models.Model):
@@ -417,7 +423,7 @@ class VanBanDi(models.Model):
     )
     ngay_ky = models.DateField(null=True, blank=True)
     noi_nhan = models.CharField(max_length=100)
-    ban_du_thao = models.FileField(upload_to="van_ban_di/du_thao/")
+    ban_du_thao = models.FileField(upload_to="van_ban_di/du_thao/", null=True, blank=True)
     ban_chinh_thuc = models.FileField(
         upload_to="van_ban_di/chinh_thuc/",
         null=True,
@@ -447,6 +453,80 @@ class VanBanDi(models.Model):
         if not self.so_vb_di:
             with transaction.atomic():
                 self.so_vb_di = generate_prefixed_code(VanBanDi, "so_vb_di", "VBO", 8)
+                super().save(*args, **kwargs)
+                return
+        super().save(*args, **kwargs)
+
+    def get_file_attachments(self, loai_tep):
+        return list(self.tep_dinh_kem_dis.filter(loai_tep=loai_tep).order_by("thu_tu", "ngay_tao", "ma_tep"))
+
+    def get_draft_attachments(self):
+        return self.get_file_attachments(TepDinhKemVanBanDi.LoaiTep.DU_THAO)
+
+    def get_official_attachments(self):
+        return self.get_file_attachments(TepDinhKemVanBanDi.LoaiTep.CHINH_THUC)
+
+    def get_primary_draft_file(self):
+        return self.ban_du_thao
+
+    def get_primary_official_file(self):
+        return self.ban_chinh_thuc
+
+
+class TepDinhKemVanBanDen(models.Model):
+    ma_tep = models.CharField(max_length=10, primary_key=True, blank=True)
+    so_vb_den = models.ForeignKey(
+        VanBanDen,
+        on_delete=models.CASCADE,
+        related_name="tep_dinh_kems",
+    )
+    tep_tin = models.FileField(upload_to="van_ban_den/")
+    thu_tu = models.PositiveIntegerField(default=0)
+    ngay_tao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "TepDinhKemVanBanDen"
+        ordering = ["thu_tu", "ngay_tao", "ma_tep"]
+
+    def __str__(self):
+        return f"{self.so_vb_den_id} - {self.tep_tin.name}"
+
+    def save(self, *args, **kwargs):
+        if not self.ma_tep:
+            with transaction.atomic():
+                self.ma_tep = generate_prefixed_code(TepDinhKemVanBanDen, "ma_tep", "TDK", 7)
+                super().save(*args, **kwargs)
+                return
+        super().save(*args, **kwargs)
+
+
+class TepDinhKemVanBanDi(models.Model):
+    class LoaiTep(models.TextChoices):
+        DU_THAO = "du_thao", "Du thao"
+        CHINH_THUC = "chinh_thuc", "Chinh thuc"
+
+    ma_tep = models.CharField(max_length=10, primary_key=True, blank=True)
+    so_vb_di = models.ForeignKey(
+        VanBanDi,
+        on_delete=models.CASCADE,
+        related_name="tep_dinh_kem_dis",
+    )
+    loai_tep = models.CharField(max_length=20, choices=LoaiTep.choices)
+    tep_tin = models.FileField(upload_to="van_ban_di/")
+    thu_tu = models.PositiveIntegerField(default=0)
+    ngay_tao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "TepDinhKemVanBanDi"
+        ordering = ["loai_tep", "thu_tu", "ngay_tao", "ma_tep"]
+
+    def __str__(self):
+        return f"{self.so_vb_di_id} - {self.loai_tep} - {self.tep_tin.name}"
+
+    def save(self, *args, **kwargs):
+        if not self.ma_tep:
+            with transaction.atomic():
+                self.ma_tep = generate_prefixed_code(TepDinhKemVanBanDi, "ma_tep", "TDI", 7)
                 super().save(*args, **kwargs)
                 return
         super().save(*args, **kwargs)
@@ -654,8 +734,8 @@ class LuanChuyenBenNgoai(models.Model):
         on_delete=models.PROTECT,
         related_name="luan_chuyen_ben_ngoai_da_tao",
     )
-    thoi_gian_gui = models.DateTimeField(default=timezone.now)
-    trang_thai_gui = models.CharField(max_length=50, choices=TrangThaiGui.choices, default=TrangThaiGui.DA_GUI)
+    thoi_gian_gui = models.DateTimeField(null=True, blank=True)
+    trang_thai_gui = models.CharField(max_length=50, choices=TrangThaiGui.choices, default=TrangThaiGui.CHO_GUI)
     ghi_chu = models.CharField(max_length=500, blank=True)
 
     class Meta:

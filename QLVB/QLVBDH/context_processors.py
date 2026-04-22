@@ -37,7 +37,8 @@ def user_profile_display(request):
     if giao_vien is None:
         return {
             "display_ho_ten": request.user.get_full_name() or request.user.get_username(),
-            "display_chuc_vu": "Qua trị",
+            "display_chuc_vu": "Quan tri",
+            "personal_profile": None,
             "ui_permissions": {},
         }
 
@@ -73,6 +74,16 @@ def user_profile_display(request):
 
     return {
         "display_ho_ten": giao_vien.ho_ten,
-        "display_chuc_vu": giao_vien.ten_vai_tro_hien_thi or "NgÃ†Â°Ã¡Â»Âi dÃƒÂ¹ng hÃ¡Â»â€¡ thÃ¡Â»â€˜ng",
+        "display_chuc_vu": giao_vien.ten_vai_tro_hien_thi or "Nguoi dung he thong",
+        "personal_profile": {
+            "ma_gv": giao_vien.ma_gv,
+            "ho_ten": giao_vien.ho_ten,
+            "lan_cuoi_dang_nhap": (
+                giao_vien.user.last_login.astimezone().strftime("%d/%m/%Y %H:%M")
+                if giao_vien.user_id and giao_vien.user.last_login
+                else "Chua dang nhap"
+            ),
+            "nhom_quyen_display": giao_vien.ten_nhom_quyen_hien_thi or "Chua phan quyen",
+        },
         "ui_permissions": ui_permissions,
     }

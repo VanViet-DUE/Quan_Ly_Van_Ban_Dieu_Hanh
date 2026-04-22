@@ -20,7 +20,14 @@
                 </div>
             </div>
 
-            <div class="Name">
+            <div
+                class="Name{% if personal_profile %} profile-trigger{% endif %}"
+                {% if personal_profile %}
+                    role="button"
+                    tabindex="0"
+                    data-open-profile="true"
+                {% endif %}
+            >
                 <div class="Name-text">
                     <p id="name">{{ display_ho_ten|default:request.user.username|upper }}</p>
                     <p id="chucvu">{{ display_chuc_vu|default:"NGUOI DUNG HE THONG"|upper }}</p>
@@ -93,7 +100,7 @@
             {% if ui_permissions.can_manage_recipients %}
                 <a class="combo-button{% if active_menu == 'recipient_management' %} active{% endif %}" href="{% url 'danh_sach_noi_nhan' %}">
                     <i class="bi bi-geo-alt-fill"></i>
-                    <label>Quan ly noi nhan</label>
+                    <label>Quản lý nơi nhận</label>
                 </a>
             {% endif %}
         </div>
@@ -127,6 +134,95 @@
 
         <footer class="page-footer">@Thuc hien boi nhom 3</footer>
     </div>
+
+    <div id="logout-confirm-modal" class="logout-modal-overlay hidden">
+        <div class="logout-modal" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title">
+            <div class="logout-modal-header" id="logout-confirm-title">Xác nhận đăng xuất</div>
+            <div class="logout-modal-body">
+                <div class="logout-icon-wrap">
+                    <div class="logout-icon-circle">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </div>
+                </div>
+                <p>Bạn có chắc muốn đăng xuất không?</p>
+                <div class="logout-actions">
+                    <button type="button" id="logout-cancel-button" class="logout-btn">Hủy</button>
+                    <a id="logout-confirm-button" class="logout-btn" href="{% url 'logout' %}">Đăng xuất</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if personal_profile %}
+        <div
+            id="personal-profile-root"
+            class="profile-modal-root"
+            data-update-url="{% url 'cap_nhat_ho_so_ca_nhan' %}"
+            data-change-password-url="{% url 'doi_mat_khau_ca_nhan' %}"
+            data-csrf-token="{{ csrf_token }}"
+        >
+            <div id="personal-profile-modal" class="profile-modal-overlay hidden">
+                <div class="profile-modal-box">
+                    <div class="profile-modal-header">
+                        <span>THÔNG TIN CÁ NHÂN</span>
+                        <button class="profile-modal-close" type="button" data-close-profile="personal-profile-modal">&#x2715;</button>
+                    </div>
+                    <div class="profile-modal-body">
+                        <div class="profile-form-group">
+                            <label for="profile-ma-gv">Mã giáo viên</label>
+                            <input type="text" id="profile-ma-gv" class="profile-input profile-readonly" value="{{ personal_profile.ma_gv }}" readonly>
+                        </div>
+                        <div class="profile-form-group">
+                            <label for="profile-ho-ten">Họ tên</label>
+                            <input type="text" id="profile-ho-ten" class="profile-input profile-readonly" value="{{ personal_profile.ho_ten }}" readonly>
+                        </div>
+                        <div class="profile-form-group">
+                            <label for="profile-last-login">Lần cuối đăng nhập</label>
+                            <input type="text" id="profile-last-login" class="profile-input profile-readonly" value="{{ personal_profile.lan_cuoi_dang_nhap }}" readonly>
+                        </div>
+                        <div class="profile-form-group">
+                            <label for="profile-group-display">Nhóm quyền</label>
+                            <input type="text" id="profile-group-display" class="profile-input profile-readonly" value="{{ personal_profile.nhom_quyen_display }}" readonly>
+                        </div>
+                        <div id="personal-profile-feedback" class="profile-feedback hidden"></div>
+                    </div>
+                    <div class="profile-modal-footer">
+                        <button type="button" id="btn-open-change-password" class="profile-btn profile-btn-secondary">Đổi mật khẩu</button>
+                        <button type="button" id="btn-edit-profile" class="profile-btn profile-btn-primary">Chỉnh sửa</button>
+                        <button type="button" id="btn-save-profile" class="profile-btn profile-btn-primary hidden">Lưu</button>
+                        <button type="button" id="btn-cancel-profile" class="profile-btn profile-btn-light hidden">Hủy</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="change-password-modal" class="profile-modal-overlay hidden">
+                <div class="profile-modal-box profile-modal-box-sm">
+                    <div class="profile-modal-header">
+                        <span>ĐỔI MẬT KHẨU</span>
+                        <button class="profile-modal-close" type="button" data-close-profile="change-password-modal">&#x2715;</button>
+                    </div>
+                    <div class="profile-modal-body">
+                        <div class="profile-form-group">
+                            <label for="old-password">Mật khẩu cũ</label>
+                            <input type="password" id="old-password" class="profile-input">
+                        </div>
+                        <div class="profile-form-group">
+                            <label for="new-password">Mật khẩu mới</label>
+                            <input type="password" id="new-password" class="profile-input">
+                        </div>
+                        <div class="profile-form-group">
+                            <label for="confirm-new-password">Nhập lại mật khẩu mới</label>
+                            <input type="password" id="confirm-new-password" class="profile-input">
+                        </div>
+                        <div id="change-password-feedback" class="profile-feedback hidden"></div>
+                    </div>
+                    <div class="profile-modal-footer">
+                        <button type="button" id="btn-save-password" class="profile-btn profile-btn-primary">Lưu</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
     <script>
         (function () {
@@ -196,7 +292,46 @@
             window.applyStatusThemes = applyStatusThemes;
         })();
     </script>
+    <script>
+        (function () {
+            const logoutLink = document.getElementById("logout");
+            const logoutModal = document.getElementById("logout-confirm-modal");
+            const cancelButton = document.getElementById("logout-cancel-button");
+
+            if (!logoutLink || !logoutModal || !cancelButton) {
+                return;
+            }
+
+            function closeLogoutModal() {
+                logoutModal.classList.remove("show");
+                logoutModal.classList.add("hidden");
+            }
+
+            logoutLink.addEventListener("click", function (event) {
+                event.preventDefault();
+                logoutModal.classList.remove("hidden");
+                logoutModal.classList.add("show");
+            });
+
+            cancelButton.addEventListener("click", closeLogoutModal);
+
+            logoutModal.addEventListener("click", function (event) {
+                if (event.target === logoutModal) {
+                    closeLogoutModal();
+                }
+            });
+
+            document.addEventListener("keydown", function (event) {
+                if (event.key === "Escape" && logoutModal.classList.contains("show")) {
+                    closeLogoutModal();
+                }
+            });
+        })();
+    </script>
 
     {% block extra_js %}{% endblock %}
+    {% if personal_profile %}
+        <script src="{% static 'js/profile_modal.js' %}"></script>
+    {% endif %}
 </body>
 </html>
