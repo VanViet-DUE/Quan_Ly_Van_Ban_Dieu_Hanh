@@ -15,7 +15,7 @@
         <label>Đăng ký văn bản đi</label>
     </a>
     <a class="combo-button" id="phbng" href="{% url 'van_ban_phat_hanh_ben_ngoai' %}">
-        <label>Phat hành bên ngoài</label>
+        <label>Phát hành bên ngoài</label>
     </a>
 {% endblock %}
 
@@ -32,7 +32,7 @@
                     </div>
                 </div>
                 <div class="form-group inline">
-                    <label for="display_trang_thai">Tranng thái:</label>
+                    <label for="display_trang_thai">Trạng thái:</label>
                     <div class="field-control">
                         <input id="display_trang_thai" type="text" value="{{ document.trang_thai_vb_di }}" readonly class="form-control bg-gray">
                     </div>
@@ -100,7 +100,7 @@
                 </div>
 
                 <div class="form-group form-group-full">
-                    <label for="display_noi_nhan">Nơi ký:</label>
+                    <label for="display_noi_nhan">Nơi nhận:</label>
                     <div class="field-control">
                         {{ form.noi_nhan }}
                         {{ form.noi_nhan.errors }}
@@ -111,7 +111,7 @@
                     <label for="{{ form.so_ky_hieu.id_for_label }}">Số ký hiệu văn bản:</label>
                     <div class="field-control cap-so-field">
                         {{ form.so_ky_hieu }}
-                        <button type="button" class="btn-main btn-cap-so{% if not can_register or is_new_registration %} hidden{% endif %}" id="btn-cap-so">Cap so</button>
+                        <button type="button" class="btn-main btn-cap-so{% if not can_register or is_new_registration %} hidden{% endif %}" id="btn-cap-so">Cấp số</button>
                         {{ form.so_ky_hieu.errors }}
                     </div>
                 </div>
@@ -163,7 +163,7 @@
                     <div class="field-control">
                         {{ form.ban_chinh_thuc }}
                         <div class="file-input-wrapper{% if not can_register %} disabled-wrapper{% endif %}" data-primary-file-trigger>
-                            <input type="text" value="{% if document.ban_chinh_thuc %}{{ document.ban_chinh_thuc.name|cut:'van_ban_di/chinh_thuc/' }}{% else %}Nhan vao bieu tuong de tai 1 tep chinh thuc{% endif %}" readonly class="form-control bg-gray" id="selected-file-name">
+                            <input type="text" value="{% if document.ban_chinh_thuc %}{{ document.ban_chinh_thuc.name|cut:'van_ban_di/chinh_thuc/' }}{% else %}Nhấn vào biểu tượng để tải lên một tệp chính thức{% endif %}" readonly class="form-control bg-gray" id="selected-file-name">
                             <button type="button" class="btn-icon" id="trigger-file-button" aria-label="Tai tep" {% if not can_register %}disabled{% endif %}>
                                 <i class="bi bi-file-earmark-break"></i>
                             </button>
@@ -220,7 +220,7 @@
                         id="btn-phat-hanh-ben-ngoai"
                         data-publish-url="{% url 'phat_hanh_ben_ngoai_van_ban_di' document.so_vb_di %}"
                     >
-                        Phát hành beên ngoài
+                        Phát hành bên ngoài
                     </button>
                 {% endif %}
                 {% if can_internal_publish %}
@@ -240,7 +240,7 @@
                         id="btn-luan-chuyen"
                         data-transfer-url="{% url 'luan_chuyen_van_ban_di' document.so_vb_di %}"
                     >
-                        Luân chuyển
+                        Gửi phân công
                     </button>
                 {% endif %}
             </div>

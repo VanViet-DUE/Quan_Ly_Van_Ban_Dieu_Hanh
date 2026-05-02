@@ -26,7 +26,7 @@
         <div class="search-bar">
             <div class="search-input-wrapper">
                 <i class="bi bi-search search-icon"></i>
-                <input type="text" id="search-input" placeholder="Tìm theo số đi, ký hiệu, trích yếu...">
+                <input type="text" id="search-input" placeholder="Tìm theo số đi, ký hiệu, trích yếu, ngày/tháng/năm...">
             </div>
             <button class="btn-xem" type="button" id="search-button">Xem</button>
         </div>
@@ -54,6 +54,7 @@
                             data-internal-publish-url="{% url 'ban_hanh_noi_bo_van_ban_di' document.so_vb_di %}"
                             data-so-di="{{ document.so_vb_di }}"
                             data-trang-thai="{{ document.trang_thai_vb_di }}"
+                            data-da-phan-cong="{% if document.da_phan_cong %}1{% else %}0{% endif %}"
                             data-da-phat-hanh-ben-ngoai="{% if document.da_phat_hanh_ben_ngoai %}1{% else %}0{% endif %}"
                             data-da-ban-hanh-noi-bo="{% if document.da_ban_hanh_noi_bo %}1{% else %}0{% endif %}"
                             data-da-gui-phan-cong="{% if document.da_gui_phan_cong %}1{% else %}0{% endif %}"

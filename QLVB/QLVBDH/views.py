@@ -47,7 +47,12 @@ from .models import (
     generate_so_ky_hieu,
 )
 
-ASSIGNMENT_PLACEHOLDER_NOTE = "Cho phan cong van ban"
+ASSIGNMENT_PLACEHOLDER_NOTE = "Chờ phân công văn bản"
+ASSIGNMENT_PLACEHOLDER_NOTES = {
+    ASSIGNMENT_PLACEHOLDER_NOTE,
+    "Chờ phân công văn bản đến",
+    "Chờ phân công văn bản đi",
+}
 
 
 # Nhom ham tien ich chung de sinh ma, chuan hoa du lieu va sap xep muc uu tien.
@@ -93,6 +98,23 @@ def annotate_priority_order(queryset, field_name="ma_muc_do__muc_do"):
     )
 
 
+def build_document_list_sort_key(document, *, status_value, date_value, sequence_value, pending_status):
+    is_pending_assignment = normalize_text(status_value) == normalize_text(pending_status)
+    timestamp = date_value.toordinal() if date_value else timezone.datetime.min.date().toordinal()
+    sequence_text = str(sequence_value or "")
+    try:
+        sequence_number = int(sequence_text)
+    except (TypeError, ValueError):
+        sequence_number = 0
+    priority_rank = get_priority_rank(getattr(getattr(document, "ma_muc_do", None), "muc_do", ""))
+    return (
+        0 if is_pending_assignment else 1,
+        priority_rank if is_pending_assignment else 0,
+        -timestamp,
+        -sequence_number,
+    )
+
+
 def get_van_ban_den_status_class(trang_thai):
     normalized = normalize_text(trang_thai)
     if "hoan thanh" in normalized or "ban hanh" in normalized:
@@ -112,7 +134,7 @@ def get_van_ban_di_status_class(trang_thai):
 
 
 def get_real_assignments_queryset(document):
-    return document.phan_congs.exclude(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE)
+    return document.phan_congs.exclude(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES)
 
 
 def is_outgoing_post_registration_status(trang_thai):
@@ -144,6 +166,22 @@ def get_van_ban_di_status_label(trang_thai):
     return get_choice_label(VanBanDi.TrangThai, trang_thai)
 
 
+def get_assignment_status_label(trang_thai):
+    return get_choice_label(PhanCongXuLy.TrangThaiXuLy, trang_thai)
+
+
+def get_approval_status_label(trang_thai):
+    return get_choice_label(XuLy.TrangThaiKy, trang_thai)
+
+
+def get_revision_status_label(trang_thai):
+    return get_choice_label(NhatKyVanBan.TrangThai, trang_thai)
+
+
+def get_external_dispatch_status_label(trang_thai):
+    return get_choice_label(LuanChuyenBenNgoai.TrangThaiGui, trang_thai)
+
+
 def get_progress_status_info(trang_thai):
     normalized = normalize_text(trang_thai)
     if normalized == normalize_text(PhanCongXuLy.TrangThaiXuLy.DA_HOAN_THANH):
@@ -169,6 +207,37 @@ def get_progress_status_info(trang_thai):
         }
     return {
         "label": (trang_thai or "Chờ xử lý").strip() or "Chờ xử lý",
+        "css_class": "status-received",
+        "rank": 1,
+    }
+
+
+# Ghi de ham cu de chuan hoa nhan trang thai tien do xu ly voi tieng Viet co dau.
+def get_progress_status_info(trang_thai):
+    normalized = normalize_text(trang_thai)
+    if normalized == normalize_text(PhanCongXuLy.TrangThaiXuLy.DA_HOAN_THANH):
+        return {
+            "label": "Đã hoàn thành",
+            "css_class": "status-complete",
+            "rank": 3,
+        }
+    if normalized == normalize_text(PhanCongXuLy.TrangThaiXuLy.DANG_XU_LY):
+        return {
+            "label": "Đang xử lý",
+            "css_class": "status-processing",
+            "rank": 2,
+        }
+    if normalized in {
+        normalize_text(PhanCongXuLy.TrangThaiXuLy.CHO_XU_LY),
+        "chua xu ly",
+    }:
+        return {
+            "label": "Chờ xử lý",
+            "css_class": "status-received",
+            "rank": 1,
+        }
+    return {
+        "label": get_assignment_status_label((trang_thai or "Chờ xử lý").strip()) or "Chờ xử lý",
         "css_class": "status-received",
         "rank": 1,
     }
@@ -230,7 +299,7 @@ def build_progress_tracking_documents(giao_vien):
         return []
 
     assignments = (
-        PhanCongXuLy.objects.filter(nguoi_phan_cong=giao_vien).exclude(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE)
+        PhanCongXuLy.objects.filter(nguoi_phan_cong=giao_vien).exclude(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES)
         .select_related(
             "nguoi_xu_ly",
             "so_vb_den__ma_loai_vb",
@@ -551,7 +620,8 @@ def serialize_external_dispatch_record(record):
         "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
         "so_ky_hieu": document.so_ky_hieu,
         "trich_yeu": document.trich_yeu,
-        "trang_thai": record.trang_thai_gui,
+        "trang_thai": get_external_dispatch_status_label(record.trang_thai_gui),
+        "trang_thai_raw": record.trang_thai_gui,
         "noi_nhan_tong_hop": record.ma_noi_nhan.ten_noi_nhan,
         "nguoi_thuc_hien": record.nguoi_thuc_hien.ho_ten,
         "nguoi_thuc_hien_id": record.nguoi_thuc_hien_id,
@@ -680,6 +750,7 @@ def serialize_van_ban_den_list_document(document):
         "co_quan_ban_hanh": document.co_quan_ban_hanh,
         "trang_thai_vb_den": document.trang_thai_vb_den,
         "trang_thai_hien_thi": get_van_ban_den_status_label(document.trang_thai_vb_den),
+        "da_phan_cong": get_real_assignments_queryset(document).exists(),
         "da_ban_hanh_noi_bo": document.da_ban_hanh_noi_bo,
         "status_class": get_van_ban_den_status_class(document.trang_thai_vb_den),
         "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
@@ -694,7 +765,7 @@ def serialize_van_ban_den_list_document(document):
 def serialize_van_ban_can_duyet(document):
     draft_attachments = serialize_outgoing_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
     primary_draft_attachment = build_primary_file_payload(document.ban_du_thao)
-    assignment_status = "Da phan cong" if get_real_assignments_queryset(document).exists() else "Chua phan cong"
+    assignment_status = "Đã phân công" if get_real_assignments_queryset(document).exists() else "Chưa phân công"
     return {
         "so_vb_di": document.so_vb_di,
         "ngay_ban_hanh": document.ngay_ban_hanh.strftime("%Y-%m-%d") if document.ngay_ban_hanh else "",
@@ -852,7 +923,7 @@ def build_assigned_documents_for_user(giao_vien):
         return []
 
     assignments = (
-        PhanCongXuLy.objects.filter(nguoi_phan_cong=giao_vien).exclude(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE)
+        PhanCongXuLy.objects.filter(nguoi_phan_cong=giao_vien).exclude(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES)
         .select_related(
             "so_vb_den__ma_loai_vb",
             "so_vb_di__ma_loai_vb",
@@ -987,26 +1058,6 @@ def get_initial_approver_for_outgoing_document(giao_vien, loai_van_ban):
 
 
 # Nhom ham thong ke du lieu de hien thi dashboard theo doi tinh trang.
-def build_status_count_items(queryset, field_name, statuses):
-    counts = {}
-    for row in queryset.values(field_name).order_by().annotate(total=models.Count("pk")):
-        counts[row[field_name]] = row["total"]
-    status_labels = {
-        VanBanDen.TrangThai.CHO_PHAN_CONG: "Chờ phân công",
-        VanBanDen.TrangThai.CHO_XU_LY: "Chờ xử lý",
-        VanBanDen.TrangThai.DA_HOAN_THANH: "Đã hoàn thành",
-        VanBanDen.TrangThai.DA_BAN_HANH: "Đã ban hành",
-        VanBanDi.TrangThai.DU_THAO: "Dự thảo",
-        VanBanDi.TrangThai.CHO_DUYET: "Chờ duyệt",
-        VanBanDi.TrangThai.DANG_CHINH_SUA: "Đang chỉnh sửa",
-        VanBanDi.TrangThai.CHO_DANG_KY: "Chờ đăng ký",
-        VanBanDi.TrangThai.CHO_LUAN_CHUYEN: "Chờ luân chuyển",
-        VanBanDi.TrangThai.CHO_PHAN_CONG: "Chờ phân công",
-        VanBanDi.TrangThai.DA_BAN_HANH: "Đã ban hành",
-    }
-    return [(f"{status_labels.get(status, status)}:", counts.get(status, 0)) for status in statuses]
-
-
 def build_document_type_count_items():
     type_counts = {}
 
@@ -1033,38 +1084,6 @@ def build_document_type_count_items():
     return [(f"{name}:", total) for name, total in sorted_items[:6]]
 
 
-def build_priority_processing_count_items():
-    priority_labels = ["Hỏa tốc", "Thượng khẩn", "Khẩn", "Bình thường"]
-    counts = {label: 0 for label in priority_labels}
-    incoming_processing_statuses = [
-        VanBanDen.TrangThai.CHO_PHAN_CONG,
-        VanBanDen.TrangThai.CHO_XU_LY,
-    ]
-    outgoing_processing_statuses = [
-        VanBanDi.TrangThai.CHO_DUYET,
-        VanBanDi.TrangThai.DANG_CHINH_SUA,
-        VanBanDi.TrangThai.CHO_DANG_KY,
-        VanBanDi.TrangThai.CHO_LUAN_CHUYEN,
-        VanBanDi.TrangThai.CHO_PHAN_CONG,
-    ]
-
-    for muc_do in VanBanDen.objects.filter(trang_thai_vb_den__in=incoming_processing_statuses).values_list("ma_muc_do__muc_do", flat=True):
-        normalized = normalize_text(muc_do)
-        for label in priority_labels:
-            if normalize_text(label) == normalized:
-                counts[label] += 1
-                break
-
-    for muc_do in VanBanDi.objects.filter(trang_thai_vb_di__in=outgoing_processing_statuses).values_list("ma_muc_do__muc_do", flat=True):
-        normalized = normalize_text(muc_do)
-        for label in priority_labels:
-            if normalize_text(label) == normalized:
-                counts[label] += 1
-                break
-
-    return [(f"{label}:", counts[label]) for label in priority_labels]
-
-
 def build_status_count_items(queryset, field_name, statuses, choice_class=None):
     counts = {}
     for row in queryset.values(field_name).order_by().annotate(total=models.Count("pk")):
@@ -1074,9 +1093,38 @@ def build_status_count_items(queryset, field_name, statuses, choice_class=None):
     return [(f"{get_choice_label(choice_class, status)}:", counts.get(status, 0)) for status in statuses]
 
 
+def build_outgoing_status_summary_items():
+    items = build_status_count_items(
+        VanBanDi.objects.all(),
+        "trang_thai_vb_di",
+        [
+            VanBanDi.TrangThai.DU_THAO,
+            VanBanDi.TrangThai.CHO_DUYET,
+            VanBanDi.TrangThai.DANG_CHINH_SUA,
+            VanBanDi.TrangThai.CHO_DANG_KY,
+            VanBanDi.TrangThai.DA_DANG_KY,
+            VanBanDi.TrangThai.CHO_PHAN_CONG,
+            VanBanDi.TrangThai.DA_BAN_HANH,
+        ],
+        VanBanDi.TrangThai,
+    )
+    items.extend(
+        [
+            ("Phát hành bên ngoài:", VanBanDi.objects.filter(da_phat_hanh_ben_ngoai=True).count()),
+            ("Ban hành nội bộ:", VanBanDi.objects.filter(da_ban_hanh_noi_bo=True).count()),
+        ]
+    )
+    return items
+
+
 def build_priority_processing_count_items():
-    priority_labels = ["Hỏa tốc", "Thượng khẩn", "Khẩn", "Bình thường"]
-    counts = {label: 0 for label in priority_labels}
+    priority_items = [
+        ("hoa toc", "Hỏa tốc"),
+        ("thuong khan", "Thượng khẩn"),
+        ("khan", "Khẩn"),
+        ("binh thuong", "Bình thường"),
+    ]
+    counts = {key: 0 for key, _ in priority_items}
     incoming_processing_statuses = [
         VanBanDen.TrangThai.CHO_PHAN_CONG,
         VanBanDen.TrangThai.CHO_XU_LY,
@@ -1085,25 +1133,24 @@ def build_priority_processing_count_items():
         VanBanDi.TrangThai.CHO_DUYET,
         VanBanDi.TrangThai.DANG_CHINH_SUA,
         VanBanDi.TrangThai.CHO_DANG_KY,
-        VanBanDi.TrangThai.CHO_LUAN_CHUYEN,
         VanBanDi.TrangThai.CHO_PHAN_CONG,
     ]
 
     for muc_do in VanBanDen.objects.filter(trang_thai_vb_den__in=incoming_processing_statuses).values_list("ma_muc_do__muc_do", flat=True):
         normalized = normalize_text(muc_do)
-        for label in priority_labels:
-            if normalize_text(label) == normalized:
-                counts[label] += 1
+        for key, _ in priority_items:
+            if key == normalized:
+                counts[key] += 1
                 break
 
     for muc_do in VanBanDi.objects.filter(trang_thai_vb_di__in=outgoing_processing_statuses).values_list("ma_muc_do__muc_do", flat=True):
         normalized = normalize_text(muc_do)
-        for label in priority_labels:
-            if normalize_text(label) == normalized:
-                counts[label] += 1
+        for key, _ in priority_items:
+            if key == normalized:
+                counts[key] += 1
                 break
 
-    return [(f"{label}:", counts[label]) for label in priority_labels]
+    return [(f"{label}:", counts[key]) for key, label in priority_items]
 
 
 # Nhom view dieu huong, dang nhap va cac man hinh tong quan van ban.
@@ -1124,9 +1171,9 @@ def login_view(request):
 
         matched_user = get_user_model().objects.filter(username=username).first()
         if matched_user is not None and not matched_user.is_active:
-            messages.error(request, "Tai khoan da bi khoa.")
+            messages.error(request, "Tài khoản đã bị khóa.")
         else:
-            messages.error(request, "Ten dang nhap hoac mat khau khong dung.")
+            messages.error(request, "Tên đăng nhập hoặc mật khẩu không đúng.")
 
     return render(request, "login.html", {"next_url": next_url})
 
@@ -1151,15 +1198,6 @@ def theo_doi_tinh_trang_view(request):
         VanBanDen.TrangThai.DA_HOAN_THANH,
         VanBanDen.TrangThai.DA_BAN_HANH,
     ]
-    outgoing_statuses = [
-        VanBanDi.TrangThai.DU_THAO,
-        VanBanDi.TrangThai.CHO_DUYET,
-        VanBanDi.TrangThai.DANG_CHINH_SUA,
-        VanBanDi.TrangThai.CHO_DANG_KY,
-        VanBanDi.TrangThai.CHO_LUAN_CHUYEN,
-        VanBanDi.TrangThai.CHO_PHAN_CONG,
-        VanBanDi.TrangThai.DA_BAN_HANH,
-    ]
     context = {
         "page_title": "Theo dõi tình trạng",
         "active_menu": "follow_condition",
@@ -1172,7 +1210,7 @@ def theo_doi_tinh_trang_view(request):
             {
                 "title": "Văn bản đi",
                 "header_class": "dark-blue-header",
-                "items": build_status_count_items(VanBanDi.objects.all(), "trang_thai_vb_di", outgoing_statuses),
+                "items": build_outgoing_status_summary_items(),
             },
             {
                 "title": "Loại văn bản",
@@ -1194,12 +1232,7 @@ def theo_doi_tinh_trang_view(request):
         VanBanDen.TrangThai,
     )
     context["dashboard_cards"][1]["title"] = "Văn bản đi"
-    context["dashboard_cards"][1]["items"] = build_status_count_items(
-        VanBanDi.objects.all(),
-        "trang_thai_vb_di",
-        outgoing_statuses,
-        VanBanDi.TrangThai,
-    )
+    context["dashboard_cards"][1]["items"] = build_outgoing_status_summary_items()
     context["dashboard_cards"][2]["title"] = "Loại văn bản"
     context["dashboard_cards"][3]["title"] = "Văn bản ưu tiên"
     return render(request, "theo_doi_tinh_trang.html", context)
@@ -1232,13 +1265,13 @@ def dang_ky_van_ban_den_view(request):
                     thoi_han=timezone.localdate(),
                     trang_thai_xl=PhanCongXuLy.TrangThaiXuLy.CHO_XU_LY,
                 )
-            messages.success(request, f"Da tiep nhan van ban den {van_ban_den.so_vb_den}.")
+            messages.success(request, f"Đã tiếp nhận văn bản đến {van_ban_den.so_vb_den}.")
             return redirect("dang_ky_van_ban_den")
     else:
         form = VanBanDenForm()
 
     context = {
-        "page_title": "Dang ky van ban den",
+        "page_title": "Đăng ký văn bản đến",
         "active_menu": "incoming_text",
         "form": form,
         "next_so_vb_den": predict_next_prefixed_code(VanBanDen, "so_vb_den", "VBD", 7),
@@ -1260,13 +1293,23 @@ def danh_sach_van_ban_den_view(request):
         annotate_priority_order(VanBanDen.objects.select_related("ma_loai_vb", "ma_muc_do"))
         .order_by("priority_rank", "-ngay_nhan", "-ngay_ky", "-so_vb_den")
     )
+    documents.sort(
+        key=lambda document: build_document_list_sort_key(
+            document,
+            status_value=document.trang_thai_vb_den,
+            date_value=document.ngay_nhan or document.ngay_ky,
+            sequence_value=document.so_vb_den,
+            pending_status=VanBanDen.TrangThai.CHO_PHAN_CONG,
+        )
+    )
     for document in documents:
         document.status_css_class = get_van_ban_den_status_class(document.trang_thai_vb_den)
         document.trang_thai_hien_thi = get_van_ban_den_status_label(document.trang_thai_vb_den)
+        document.da_phan_cong = get_real_assignments_queryset(document).exists()
         document.attachments_json = serialize_attachment_json(serialize_incoming_attachments(document))
 
     context = {
-        "page_title": "Danh sach van ban den",
+        "page_title": "Danh sách văn bản đến",
         "active_menu": "incoming_text",
         "documents": documents,
         "document_status_choices": build_choice_options(
@@ -1298,9 +1341,19 @@ def danh_sach_van_ban_di_view(request):
         .prefetch_related("xu_lys__ma_gv")
         .order_by("priority_rank", "-ngay_ban_hanh", "-ngay_ky", "-so_vb_di")
     )
+    documents.sort(
+        key=lambda document: build_document_list_sort_key(
+            document,
+            status_value=document.trang_thai_vb_di,
+            date_value=document.ngay_ban_hanh or document.ngay_ky,
+            sequence_value=document.so_vb_di,
+            pending_status=VanBanDi.TrangThai.CHO_PHAN_CONG,
+        )
+    )
     for document in documents:
         document.status_css_class = get_van_ban_di_status_class(document.trang_thai_vb_di)
         document.trang_thai_hien_thi = get_van_ban_di_status_label(document.trang_thai_vb_di)
+        document.da_phan_cong = bool(document.da_gui_phan_cong)
         document.nguoi_ky_hien_thi = get_document_signers_display(document)
         document.ban_du_thao_attachments_json = serialize_attachment_json(
             serialize_outgoing_supporting_attachments(document, TepDinhKemVanBanDi.LoaiTep.DU_THAO)
@@ -1310,7 +1363,7 @@ def danh_sach_van_ban_di_view(request):
         )
 
     context = {
-        "page_title": "Danh sach van ban di",
+        "page_title": "Danh sách văn bản đi",
         "active_menu": "outgoing_text",
         "documents": documents,
         "document_status_choices": build_choice_options(
@@ -1368,7 +1421,7 @@ def dang_ky_van_ban_di_tu_danh_muc_view(request):
         form = VanBanDiDangKyForm(create_mode=True, giao_vien=giao_vien)
 
     context = {
-        "page_title": "Dang ky van ban di",
+        "page_title": "Đăng ký văn bản đi",
         "active_menu": "outgoing_text",
         "document": document,
         "form": form,
@@ -1398,7 +1451,7 @@ def tao_van_ban_view(request):
             hieu_truong = get_hieu_truong()
             nguoi_duyet_dau_tien, vai_tro_ky = get_initial_approver_for_outgoing_document(giao_vien, van_ban_di.ma_loai_vb)
             if nguoi_duyet_dau_tien is None:
-                form.add_error(None, "Khong xac dinh duoc nguoi duyet dau tien cho van ban nay.")
+                form.add_error(None, "Không xác định được người đầu tiên duyệt cho văn bản này.")
             else:
                 van_ban_di.nguoi_ky = hieu_truong or nguoi_duyet_dau_tien
                 van_ban_di.save()
@@ -1428,7 +1481,7 @@ def tao_van_ban_view(request):
                         vai_tro_ky=vai_tro_ky,
                         trang_thai_ky=XuLy.TRANG_THAI_CHO_DUYET,
                     )
-                messages.success(request, f"Da gui duyet van ban di {van_ban_di.so_vb_di}.")
+                messages.success(request, f"Đã gửi duyệt văn bản đi {van_ban_di.so_vb_di}.")
                 return redirect("danh_sach_van_ban_di")
     else:
         form = TaoVanBanDiForm(giao_vien=giao_vien)
@@ -1458,13 +1511,13 @@ def them_mau_van_ban_view(request):
         form = ThemMauVanBanForm(request.POST, request.FILES)
         if form.is_valid():
             mau_van_ban = form.save()
-            messages.success(request, f"Da luu mau van ban {mau_van_ban.ma_mau_vb}.")
+            messages.success(request, f"Đã lưu mẫu văn bản {mau_van_ban.ma_mau_vb}.")
             return redirect("them_mau_van_ban")
     else:
         form = ThemMauVanBanForm()
 
     context = {
-        "page_title": "Them mau van ban",
+        "page_title": "Thêm mẫu văn bản",
         "active_menu": "template_text",
         "next_ma_mau_vb": predict_next_prefixed_code(MauVanBan, "ma_mau_vb", "MVB", 7),
         "form": form,
@@ -1480,7 +1533,7 @@ def duyet_van_ban_view(request):
     if denied_response:
         return denied_response
     if giao_vien is None:
-        messages.error(request, "Tai khoan hien tai chua lien ket voi giao vien.")
+        messages.error(request, "Tài khoản hiện chưa liên kết với giáo viên.")
         return redirect("theo_doi_tinh_trang")
 
     xu_ly_list = (
@@ -1502,14 +1555,8 @@ def duyet_van_ban_view(request):
         latest_revision = document.nhat_kys.order_by("-thoi_gian_tao").first()
         document.stt = index
         real_assignments = get_real_assignments_queryset(document)
-        document.assignment_status = "Da phan cong" if real_assignments.exists() else "Chua phan cong"
-        approval_status_labels = {
-            XuLy.TRANG_THAI_CHO_DUYET: "Cho duyet",
-            XuLy.TRANG_THAI_DA_DUYET: "Da duyet",
-            XuLy.TRANG_THAI_DA_UY_QUYEN: "Da uy quyen",
-            XuLy.TRANG_THAI_CHO_CHINH_SUA: "Cho chinh sua",
-        }
-        document.approval_status = approval_status_labels.get(xu_ly.trang_thai_ky, xu_ly.trang_thai_ky)
+        document.assignment_status = "Đã phân công" if real_assignments.exists() else "Chưa phân công"
+        document.approval_status = get_approval_status_label(xu_ly.trang_thai_ky)
         document.assigned_ids_csv = ",".join(real_assignments.values_list("nguoi_xu_ly_id", flat=True))
         document.chi_dao = real_assignments.first().noi_dung_cd if real_assignments.exists() else ""
         document.current_step = xu_ly.vai_tro_ky
@@ -1522,7 +1569,7 @@ def duyet_van_ban_view(request):
         documents.append(document)
 
     context = {
-        "page_title": "Quan ly cong viec",
+        "page_title": "Quản lý công việc",
         "active_menu": "work_management",
         "documents": documents,
         "giao_vien_list": GiaoVien.objects.order_by("ho_ten"),
@@ -1602,7 +1649,11 @@ def can_phan_cong_view(request):
                     {"id": phan_cong.nguoi_xu_ly_id, "name": phan_cong.nguoi_xu_ly.ho_ten, "instruction": phan_cong.noi_dung_cd}
                     for phan_cong in phan_congs
                 ],
-                "trang_thai": current_status if loai == "den" else "Da gui phan cong",
+                "trang_thai": (
+                    get_van_ban_den_status_label(current_status)
+                    if loai == "den"
+                    else "Đã gửi phân công"
+                ),
             }
         )
         document_keys.add(document_key)
@@ -1675,11 +1726,11 @@ def chi_tiet_tien_do_view(request):
         return denied_response
 
     if loai not in {"den", "di"}:
-        return JsonResponse({"success": False, "message": "Loai van ban khong hop le."}, status=400)
+        return JsonResponse({"success": False, "message": "Loại văn bản không hợp lệ."}, status=400)
     if not record_id:
-        return JsonResponse({"success": False, "message": "Thieu ma van ban."}, status=400)
+        return JsonResponse({"success": False, "message": "Thiếu mã văn bản."}, status=400)
     if giao_vien is None:
-        return JsonResponse({"success": False, "message": "Tai khoan hien tai chua lien ket voi giao vien."}, status=400)
+        return JsonResponse({"success": False, "message": "Tài khoản hiện chưa liên kết với giáo viên"}, status=400)
 
     filters = {"nguoi_phan_cong": giao_vien}
     if loai == "den":
@@ -1698,7 +1749,7 @@ def chi_tiet_tien_do_view(request):
 # Nhom ham tong hop cong viec ca nhan, van ban da ban hanh va van ban da tao.
 def build_personal_processing_documents(giao_vien):
     assignments = (
-        PhanCongXuLy.objects.filter(nguoi_xu_ly=giao_vien).exclude(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE)
+        PhanCongXuLy.objects.filter(nguoi_xu_ly=giao_vien).exclude(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES)
         .select_related("so_vb_den__ma_loai_vb", "so_vb_di__ma_loai_vb", "so_vb_di__nguoi_tao", "nguoi_phan_cong")
         .order_by("-thoi_gian_phan_cong", "ma_xu_ly")
     )
@@ -1736,6 +1787,7 @@ def build_personal_processing_documents(giao_vien):
                 "noi_dung_cd": assignment.noi_dung_cd,
                 "thoi_han": assignment.thoi_han.strftime("%Y-%m-%d") if assignment.thoi_han else "",
                 "trang_thai_xl": assignment.trang_thai_xl,
+                "trang_thai_xl_hien_thi": get_assignment_status_label(assignment.trang_thai_xl),
                 "file_name": (
                     build_primary_file_payload(document.file_van_ban)["name"]
                     if is_incoming
@@ -1798,7 +1850,7 @@ def build_published_documents():
                 "trich_yeu": document.trich_yeu,
                 "nguon": "Van ban den",
                 "co_quan_ban_hanh": document.co_quan_ban_hanh,
-                "trang_thai": "Da ban hanh noi bo",
+                "trang_thai": "Đã ban hành nội bộ",
                 "file_name": build_primary_file_payload(document.file_van_ban)["name"],
                 "file_url": build_primary_file_payload(document.file_van_ban)["url"],
                 "attachments_json": serialize_attachment_json(serialize_incoming_attachments(document)),
@@ -1824,7 +1876,7 @@ def build_published_documents():
                 "trich_yeu": document.trich_yeu,
                 "nguon": "Van ban di",
                 "co_quan_ban_hanh": getattr(settings, "DON_VI_CAP_SO_VAN_BAN", "THPTND"),
-                "trang_thai": "Da ban hanh noi bo",
+                "trang_thai": "Đã ban hành nội bộ",
                 "file_name": build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["name"],
                 "file_url": build_primary_file_payload(document.ban_chinh_thuc or document.ban_du_thao)["url"],
                 "attachments_json": serialize_attachment_json(
@@ -1870,7 +1922,7 @@ def build_created_documents(giao_vien):
                 "trich_yeu": document.trich_yeu,
                 "nguon": "Van ban di",
                 "co_quan_ban_hanh": getattr(settings, "DON_VI_CAP_SO_VAN_BAN", "THPTND"),
-                "trang_thai": document.trang_thai_vb_di,
+                "trang_thai": get_van_ban_di_status_label(document.trang_thai_vb_di),
                 "file_name": build_primary_file_payload(document.ban_du_thao)["name"],
                 "file_url": build_primary_file_payload(document.ban_du_thao)["url"],
                 "attachments_json": serialize_attachment_json(
@@ -1905,7 +1957,7 @@ def build_returned_documents(giao_vien):
                 "trich_yeu": document.trich_yeu,
                 "nguoi_yeu_cau": latest_revision.ma_nguoi_tao.ho_ten,
                 "noi_dung_yeu_cau": latest_revision.yc_chinh_sua,
-                "trang_thai": latest_revision.trang_thai,
+                "trang_thai": get_revision_status_label(latest_revision.trang_thai),
                 "file_name": build_primary_file_payload(document.ban_du_thao)["name"],
                 "file_url": build_primary_file_payload(document.ban_du_thao)["url"],
                 "attachments_json": serialize_attachment_json(
@@ -1942,7 +1994,8 @@ def build_external_published_documents():
                 "ten_loai_vb": document.ma_loai_vb.ten_loai_vb,
                 "so_ky_hieu": document.so_ky_hieu,
                 "trich_yeu": document.trich_yeu,
-                "trang_thai": record.trang_thai_gui,
+                "trang_thai": get_external_dispatch_status_label(record.trang_thai_gui),
+                "trang_thai_raw": record.trang_thai_gui,
                 "noi_nhan_tong_hop": record.ma_noi_nhan.ten_noi_nhan,
                 "nguoi_thuc_hien": record.nguoi_thuc_hien.ho_ten,
                 "nguoi_thuc_hien_id": record.nguoi_thuc_hien_id,
@@ -2025,7 +2078,7 @@ def van_ban_da_tao_view(request):
         return denied_response
     context = {
         "page_title": "Danh sach van ban",
-        "active_menu": "document_list",
+        "active_menu": "create_text",
         "documents": build_created_documents(giao_vien),
         "is_published_document_list": False,
         "is_created_document_list": True,
@@ -2061,19 +2114,26 @@ def cap_nhat_tien_do_ca_nhan_view(request, ma_xu_ly):
         return denied_response
     assignment = get_object_or_404(PhanCongXuLy.objects.select_related("nguoi_xu_ly"), pk=ma_xu_ly, nguoi_xu_ly=giao_vien)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
     trang_thai_xl = request.POST.get("trang_thai_xl", "").strip()
     if trang_thai_xl not in {
         PhanCongXuLy.TrangThaiXuLy.DANG_XU_LY,
         PhanCongXuLy.TrangThaiXuLy.DA_HOAN_THANH,
     }:
-        return JsonResponse({"success": False, "message": "Trang thai cap nhat khong hop le."}, status=400)
+        return JsonResponse({"success": False, "message": "Trạng thái cập nhật không hợp lệ."}, status=400)
     assignment.trang_thai_xl = trang_thai_xl
     assignment.save(update_fields=["trang_thai_xl"])
     parent_document = assignment.so_vb_den or assignment.so_vb_di
     if parent_document is not None:
         sync_document_processing_status_from_assignments(parent_document, is_incoming=assignment.so_vb_den_id is not None)
-    return JsonResponse({"success": True, "message": "Da cap nhat tien do xu ly.", "trang_thai_xl": assignment.trang_thai_xl})
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Đã cập nhật tiến độ xử lý.",
+            "trang_thai_xl": assignment.trang_thai_xl,
+            "trang_thai_xl_hien_thi": get_assignment_status_label(assignment.trang_thai_xl),
+        }
+    )
 
 
 @login_required
@@ -2103,7 +2163,7 @@ def chuyen_phan_cong_ca_nhan_view(request, ma_xu_ly):
         )
         if has_teacher_assignment:
             return JsonResponse(
-                {"success": False, "message": "Van ban nay da co giao vien trong to duoc phan cong xu ly."},
+                {"success": False, "message": "Văn ban này đã có giáo viên trong tổ được phân công xử lý."},
                 status=400,
             )
 
@@ -2114,9 +2174,9 @@ def chuyen_phan_cong_ca_nhan_view(request, ma_xu_ly):
         parent_document.trang_thai_vb_den = VanBanDen.TrangThai.CHO_PHAN_CONG
         parent_document.save(update_fields=["trang_thai_vb_den"])
     elif parent_document is not None:
-        parent_document.trang_thai_vb_di = VanBanDi.TrangThai.DA_DANG_KY
+        parent_document.trang_thai_vb_di = VanBanDi.TrangThai.CHO_PHAN_CONG
         parent_document.save(update_fields=["trang_thai_vb_di"])
-    return JsonResponse({"success": True, "message": "Da chuyen van ban sang muc can phan cong cua to truong."})
+    return JsonResponse({"success": True, "message": "Đã chuyển văn bản sang mục cần phân công của tổ trưởng."})
 
 
 @login_required
@@ -2127,19 +2187,19 @@ def hoan_thanh_chinh_sua_van_ban_view(request, so_vb_di):
         return denied_response
     document = get_object_or_404(VanBanDi.objects.prefetch_related("nhat_kys"), pk=so_vb_di, nguoi_tao=giao_vien)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
     latest_revision = document.nhat_kys.order_by("-thoi_gian_tao").first()
     if latest_revision is None or normalize_text(latest_revision.trang_thai) != normalize_text(NhatKyVanBan.TrangThai.CHO_CHINH_SUA):
-        return JsonResponse({"success": False, "message": "Van ban nay khong co yeu cau chinh sua dang mo."}, status=400)
+        return JsonResponse({"success": False, "message": "Văn bản này không có yêu cầu chỉnh sửa đang mở."}, status=400)
 
     trich_yeu = request.POST.get("trich_yeu", "").strip()
     ma_loai_vb_id = request.POST.get("ma_loai_vb", "").strip()
     uploaded_files = request.FILES.getlist("ban_du_thao")
 
     if not trich_yeu:
-        return JsonResponse({"success": False, "message": "Vui long nhap trich yeu van ban."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng nhập trích yếu văn bản."}, status=400)
     if not ma_loai_vb_id:
-        return JsonResponse({"success": False, "message": "Vui long chon loai van ban."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng chọn loại văn bản."}, status=400)
 
     loai_van_ban = get_object_or_404(LoaiVanBan.objects.filter(ap_dung__in=[0, 2]), pk=ma_loai_vb_id)
     document.trich_yeu = trich_yeu
@@ -2173,7 +2233,7 @@ def hoan_thanh_chinh_sua_van_ban_view(request, so_vb_di):
     document.xu_lys.filter(trang_thai_ky=XuLy.TRANG_THAI_CHO_CHINH_SUA).update(
         trang_thai_ky=XuLy.TRANG_THAI_CHO_DUYET
     )
-    return JsonResponse({"success": True, "message": f"Da cap nhat ban du thao cho van ban {document.so_vb_di}."})
+    return JsonResponse({"success": True, "message": f"Đã cập nhật bản dự thảo cho văn bản {document.so_vb_di}."})
 
 
 # Nhom API xu ly thao tac phan cong, duyet va cap nhat trang thai van ban.
@@ -2186,7 +2246,7 @@ def luu_phan_cong_xu_ly_view(request):
     if denied_response:
         return denied_response
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ"}, status=405)
 
     loai = request.POST.get("loai")
     record_id = request.POST.get("record_id")
@@ -2196,7 +2256,7 @@ def luu_phan_cong_xu_ly_view(request):
     try:
         assignment_rows = json.loads(assignment_payload) if assignment_payload else []
     except json.JSONDecodeError:
-        return JsonResponse({"success": False, "message": "Du lieu phan cong khong hop le."}, status=400)
+        return JsonResponse({"success": False, "message": "Dữ liệu phân công không hợp lệ."}, status=400)
 
     normalized_assignment_rows = []
     for row in assignment_rows:
@@ -2214,16 +2274,16 @@ def luu_phan_cong_xu_ly_view(request):
     assigned_ids = [row["id"] for row in normalized_assignment_rows]
 
     if loai not in {"den", "di"}:
-        return JsonResponse({"success": False, "message": "Loai van ban khong hop le."}, status=400)
+        return JsonResponse({"success": False, "message": "Loại văn bản không hợp lệ."}, status=400)
     if not record_id:
-        return JsonResponse({"success": False, "message": "Thieu ma van ban de phan cong."}, status=400)
+        return JsonResponse({"success": False, "message": "Thiếu mã văn bản để phân công."}, status=400)
     if not assigned_ids:
-        return JsonResponse({"success": False, "message": "Vui long chon it nhat mot nguoi xu ly."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng chọn ít nhất một người xử lý."}, status=400)
     if not thoi_han:
-        return JsonResponse({"success": False, "message": "Vui long chon thoi han xu ly."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng chọn thời hạn sử lý."}, status=400)
     if any(not row["instruction"] for row in normalized_assignment_rows):
         return JsonResponse(
-            {"success": False, "message": "Vui long nhap noi dung chi dao cho tung nguoi xu ly."},
+            {"success": False, "message": "Vui lòng nhâp nội dung chỉ đạo cho từng người xử lý."},
             status=400,
         )
     nguoi_phan_cong = getattr(request.user, "ho_so_giao_vien", None)
@@ -2233,10 +2293,10 @@ def luu_phan_cong_xu_ly_view(request):
         existing_assignments = {assignment.nguoi_xu_ly_id: assignment for assignment in document.phan_congs.all()}
     else:
         document = get_object_or_404(VanBanDi, pk=record_id)
-        placeholder_assignments = list(document.phan_congs.filter(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE))
+        placeholder_assignments = list(document.phan_congs.filter(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES))
         existing_assignments = {
             assignment.nguoi_xu_ly_id: assignment
-            for assignment in document.phan_congs.exclude(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE)
+            for assignment in document.phan_congs.exclude(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES)
         }
 
     if is_truong_bo_mon(nguoi_phan_cong):
@@ -2333,10 +2393,10 @@ def phan_cong_xu_ly_van_ban_di_view(request, so_vb_di):
     assigned_ids = [value for value in request.POST.getlist("assigned_ids[]") if value]
     chi_dao = request.POST.get("chi_dao", "").strip()
 
-    placeholder_assignments = list(document.phan_congs.filter(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE))
+    placeholder_assignments = list(document.phan_congs.filter(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES))
     existing_assignments = {
         assignment.nguoi_xu_ly_id: assignment
-        for assignment in document.phan_congs.exclude(noi_dung_cd=ASSIGNMENT_PLACEHOLDER_NOTE)
+        for assignment in document.phan_congs.exclude(noi_dung_cd__in=ASSIGNMENT_PLACEHOLDER_NOTES)
     }
     target_ids = set(assigned_ids)
 
@@ -2401,7 +2461,7 @@ def duyet_van_ban_di_action_view(request, so_vb_di):
     if action == "request_revision":
         yc_chinh_sua = request.POST.get("yc_chinh_sua", "").strip()
         if not yc_chinh_sua:
-            return JsonResponse({"success": False, "message": "Vui long nhap noi dung yeu cau chinh sua."}, status=400)
+            return JsonResponse({"success": False, "message": "Vui lòng nhập nội dung yêu cầu chỉnh sửa."}, status=400)
         NhatKyVanBan.objects.create(
             ma_nguoi_tao=giao_vien,
             ma_vb_di=document,
@@ -2429,9 +2489,9 @@ def duyet_van_ban_di_action_view(request, so_vb_di):
         delegate_id = request.POST.get("delegate_id", "").strip()
         delegate_target = get_object_or_404(GiaoVien, pk=delegate_id)
         if not is_hieu_truong(giao_vien):
-            return JsonResponse({"success": False, "message": "Ban khong co quyen uy quyen duyet."}, status=403)
+            return JsonResponse({"success": False, "message": "Bạn không có quyền ủy quyền duyệt"}, status=403)
         if not is_pho_hieu_truong(delegate_target):
-            return JsonResponse({"success": False, "message": "Chi duoc uy quyen cho pho hieu truong."}, status=400)
+            return JsonResponse({"success": False, "message": "Chỉ đuợc ủy quyền cho phó hiệu trưởng."}, status=400)
         delegated_record, created = XuLy.objects.get_or_create(
             ma_vb_di=document,
             ma_gv=delegate_target,
@@ -2445,14 +2505,14 @@ def duyet_van_ban_di_action_view(request, so_vb_di):
         xu_ly.trang_thai_ky = XuLy.TRANG_THAI_DA_UY_QUYEN
         xu_ly.thoi_gian_ky = timezone.now()
         xu_ly.save(update_fields=["trang_thai_ky", "thoi_gian_ky"])
-        return JsonResponse({"success": True, "message": f"Da uy quyen duyet van ban {document.so_vb_di}."})
+        return JsonResponse({"success": True, "message": f"Đã ủy quyền duyệt văn bản {document.so_vb_di}."})
 
     if action == "forward":
         if xu_ly.vai_tro_ky != XuLy.VAI_TRO_KY_NHAY:
-            return JsonResponse({"success": False, "message": "Van ban nay khong o buoc gui duyet tiep."}, status=400)
+            return JsonResponse({"success": False, "message": "Văn bản này không ở bươ gửi duyệt tiếp"}, status=400)
         hieu_truong = get_hieu_truong()
         if hieu_truong is None:
-            return JsonResponse({"success": False, "message": "Khong tim thay hieu truong de gui duyet."}, status=400)
+            return JsonResponse({"success": False, "message": "Không tìm thấy hiệu trưởng để gửi duyệt."}, status=400)
         xu_ly.trang_thai_ky = XuLy.TRANG_THAI_DA_DUYET
         xu_ly.thoi_gian_ky = timezone.now()
         xu_ly.save(update_fields=["trang_thai_ky", "thoi_gian_ky"])
@@ -2467,7 +2527,7 @@ def duyet_van_ban_di_action_view(request, so_vb_di):
         )
         document.trang_thai_vb_di = VanBanDi.TrangThai.CHO_DUYET
         document.save(update_fields=["trang_thai_vb_di"])
-        return JsonResponse({"success": True, "message": f"Da gui van ban {document.so_vb_di} len hieu truong duyet."})
+        return JsonResponse({"success": True, "message": f"Đã gửi văn bản {document.so_vb_di} lên hiệu trưởng duyệt."})
 
     xu_ly.trang_thai_ky = XuLy.TRANG_THAI_DA_DUYET
     xu_ly.thoi_gian_ky = timezone.now()
@@ -2519,7 +2579,7 @@ def cap_nhat_mau_van_ban_view(request, ma_mau_vb):
         return denied_response
     mau_van_ban = get_object_or_404(MauVanBan.objects.select_related("ma_loai_vb"), pk=ma_mau_vb)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     form = CapNhatMauVanBanForm(request.POST, request.FILES, instance=mau_van_ban)
     if not form.is_valid():
@@ -2529,7 +2589,7 @@ def cap_nhat_mau_van_ban_view(request, ma_mau_vb):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da cap nhat mau van ban {updated_template.ma_mau_vb}.",
+            "message": f" Đã cập nhật mẫu văn bản {updated_template.ma_mau_vb}.",
             "template": serialize_mau_van_ban(updated_template),
         }
     )
@@ -2545,10 +2605,10 @@ def xoa_mau_van_ban_view(request, ma_mau_vb):
         return denied_response
     mau_van_ban = get_object_or_404(MauVanBan, pk=ma_mau_vb)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     mau_van_ban.delete()
-    return JsonResponse({"success": True, "message": f"Da xoa mau van ban {ma_mau_vb}.", "ma_mau_vb": ma_mau_vb})
+    return JsonResponse({"success": True, "message": f"Đã xóa mẫu văn bản {ma_mau_vb}.", "ma_mau_vb": ma_mau_vb})
 
 
 @login_required
@@ -2573,7 +2633,7 @@ def dang_ky_van_ban_di_view(request, so_vb_di):
 
     if request.method == "POST":
         if not can_register:
-            messages.error(request, "Van ban nay khong o trang thai cho dang ky.")
+            messages.error(request, "Văn bản này không ở trạng thái chờ đăng ký.")
             return redirect("dang_ky_van_ban_di", so_vb_di=document.so_vb_di)
 
         form = VanBanDiDangKyForm(
@@ -2592,7 +2652,7 @@ def dang_ky_van_ban_di_view(request, so_vb_di):
             registered_document.trang_thai_vb_di = VanBanDi.TrangThai.DA_DANG_KY
             registered_document.save()
             form.save_uploaded_files(registered_document)
-            messages.success(request, f"Da dang ky van ban di {registered_document.so_vb_di}.")
+            messages.success(request, f"Đã đăng ký văn bản đi {registered_document.so_vb_di}.")
             return redirect("dang_ky_van_ban_di", so_vb_di=registered_document.so_vb_di)
     else:
         form = VanBanDiDangKyForm(instance=document, editable=can_register)
@@ -2626,10 +2686,10 @@ def cap_so_van_ban_di_view(request, so_vb_di):
         return denied_response
     document = get_object_or_404(VanBanDi.objects.select_related("ma_loai_vb"), pk=so_vb_di)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức khng hợp lệ"}, status=405)
 
     if normalize_text(document.trang_thai_vb_di) != normalize_text(VanBanDi.TrangThai.CHO_DANG_KY):
-        return JsonResponse({"success": False, "message": "Chi cap so cho van ban dang cho dang ky."}, status=400)
+        return JsonResponse({"success": False, "message": "Chỉ cấp số cho văn bản đang chờ đăng ký."}, status=400)
 
     try:
         so_ky_hieu = generate_so_ky_hieu(VanBanDi, document)
@@ -2649,10 +2709,10 @@ def luan_chuyen_van_ban_di_view(request, so_vb_di):
         return denied_response
     document = get_object_or_404(VanBanDi, pk=so_vb_di)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     if not is_outgoing_post_registration_status(document.trang_thai_vb_di):
-        return JsonResponse({"success": False, "message": "Chi gui phan cong cho van ban da dang ky."}, status=400)
+        return JsonResponse({"success": False, "message": "Chỉ gửi phân công cho văn bản đã đăng ký."}, status=400)
 
     signer_records = list(document.xu_lys.select_related("ma_gv").order_by("ma_xu_ly"))
     signer_ids = []
@@ -2662,7 +2722,7 @@ def luan_chuyen_van_ban_di_view(request, so_vb_di):
     if not signer_ids and document.nguoi_ky_id:
         signer_ids.append(document.nguoi_ky_id)
     if not signer_ids:
-        return JsonResponse({"success": False, "message": "Van ban chua co nguoi ky de gui phan cong."}, status=400)
+        return JsonResponse({"success": False, "message": "Văn bản chưa có người ký để gửi pha công"}, status=400)
 
     for signer_id in signer_ids:
         PhanCongXuLy.objects.get_or_create(
@@ -2682,7 +2742,7 @@ def luan_chuyen_van_ban_di_view(request, so_vb_di):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da gui phan cong van ban {document.so_vb_di}.",
+            "message": f"Đã gửi phân công văn bản {document.so_vb_di}.",
             "document": {
                 "so_vb_di": document.so_vb_di,
                 "trang_thai_vb_di": document.trang_thai_vb_di,
@@ -2703,7 +2763,7 @@ def ban_hanh_noi_bo_van_ban_den_view(request, so_vb_den):
         return denied_response
     document = get_object_or_404(VanBanDen.objects.select_related("ma_loai_vb", "ma_muc_do"), pk=so_vb_den)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ"}, status=405)
 
     document.da_ban_hanh_noi_bo = not document.da_ban_hanh_noi_bo
     message = (
@@ -2731,7 +2791,7 @@ def cap_nhat_van_ban_den_view(request, so_vb_den):
         return denied_response
     van_ban_den = get_object_or_404(VanBanDen, pk=so_vb_den)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     normalized_status = normalize_text(van_ban_den.trang_thai_vb_den)
     has_attachment_changes = bool(
@@ -2744,7 +2804,7 @@ def cap_nhat_van_ban_den_view(request, so_vb_den):
         normalize_text(VanBanDen.TrangThai.DA_BAN_HANH),
     } and not has_attachment_changes:
         return JsonResponse(
-            {"success": False, "message": "Van ban den da duoc phan cong thi khong con duoc chinh sua."},
+            {"success": False, "message": "Văn bản đến đã được phân công thì không được chỉnh sửa."},
             status=400,
         )
 
@@ -2761,7 +2821,7 @@ def cap_nhat_van_ban_den_view(request, so_vb_den):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da cap nhat van ban den {updated_document.so_vb_den}.",
+            "message": "Đã chỉnh sửa văn bản thành công.",
             "document": serialize_van_ban_den_list_document(updated_document),
         }
     )
@@ -2777,7 +2837,7 @@ def cap_nhat_van_ban_di_view(request, so_vb_di):
         return denied_response
     van_ban_di = get_object_or_404(VanBanDi, pk=so_vb_di)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     form = VanBanDiUpdateForm(
         request.POST,
@@ -2799,7 +2859,7 @@ def cap_nhat_van_ban_di_view(request, so_vb_di):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da cap nhat van ban di {updated_document.so_vb_di}.",
+            "message": f"Đã cập nhật văn bản đi.",
             "document": {
                 "so_vb_di": updated_document.so_vb_di,
                 "ngay_ban_hanh": (
@@ -2844,23 +2904,23 @@ def phat_hanh_ben_ngoai_van_ban_di_view(request, so_vb_di):
         return denied_response
     document = get_object_or_404(VanBanDi, pk=so_vb_di)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     if not is_outgoing_post_registration_status(document.trang_thai_vb_di):
         return JsonResponse(
-            {"success": False, "message": "Chi phat hanh ben ngoai cho van ban da dang ky."},
+            {"success": False, "message": "Chỉ phát hành bên ngoài cho văn bản đã đăng ký."},
             status=400,
         )
 
     recipient_ids = request.POST.getlist("noi_nhan_ids[]") or request.POST.getlist("noi_nhan_ids")
     recipient_ids = [item.strip() for item in recipient_ids if item.strip()]
     if not recipient_ids:
-        return JsonResponse({"success": False, "message": "Vui long chon it nhat mot noi nhan."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng chọn ít nhất một nơi nhận."}, status=400)
     ghi_chu = request.POST.get("ghi_chu", "").strip()
 
     recipients = list(NoiNhan.objects.filter(pk__in=recipient_ids).order_by("ten_noi_nhan"))
     if len(recipients) != len(set(recipient_ids)):
-        return JsonResponse({"success": False, "message": "Danh sach noi nhan khong hop le."}, status=400)
+        return JsonResponse({"success": False, "message": "Danh sách nơi nhận không hợp lệ."}, status=400)
 
     created_records = []
     for recipient in recipients:
@@ -2879,7 +2939,7 @@ def phat_hanh_ben_ngoai_van_ban_di_view(request, so_vb_di):
 
     if not created_records:
         return JsonResponse(
-            {"success": False, "message": "Van ban nay da duoc phat hanh den cac noi nhan da chon."},
+            {"success": False, "message": "Văn bản này đã được phát hành đến các nơi nhận đã chọn."},
             status=400,
         )
 
@@ -2889,7 +2949,7 @@ def phat_hanh_ben_ngoai_van_ban_di_view(request, so_vb_di):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da tao {len(created_records)} ban ghi phat hanh ben ngoai cho van ban {document.so_vb_di}.",
+            "message": f"Đã tạo {len(created_records)} bản ghi phát hành bên ngoài cho văn bản {document.so_vb_di}.",
             "records": [serialize_external_dispatch_record(record) for record in created_records],
         }
     )
@@ -2903,20 +2963,20 @@ def cap_nhat_luan_chuyen_ben_ngoai_view(request, ma_luan_chuyen):
         allowed=(giao_vien is None or is_van_thu(giao_vien)),
     )
     if denied_response:
-        return JsonResponse({"success": False, "message": "Ban khong co quyen cap nhat phat hanh ben ngoai."}, status=403)
+        return JsonResponse({"success": False, "message": "Bạn không có quyền cập nhật phát hành bên ngoài."}, status=403)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     record = get_object_or_404(
         LuanChuyenBenNgoai.objects.select_related("ma_vb_di", "ma_vb_di__ma_loai_vb", "ma_noi_nhan", "nguoi_thuc_hien"),
         pk=ma_luan_chuyen,
     )
     if record.trang_thai_gui == LuanChuyenBenNgoai.TrangThaiGui.DA_GUI:
-        return JsonResponse({"success": False, "message": "Ban ghi nay da duoc danh dau da gui."}, status=400)
+        return JsonResponse({"success": False, "message": "Bản ghi này đã được đánh dấu đã gửi"}, status=400)
 
     ma_noi_nhan = request.POST.get("ma_noi_nhan", "").strip()
     if not ma_noi_nhan:
-        return JsonResponse({"success": False, "message": "Vui long chon noi nhan."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng chọn nơi nhận."}, status=400)
     recipient = get_object_or_404(NoiNhan, pk=ma_noi_nhan)
     duplicate_record = (
         LuanChuyenBenNgoai.objects.exclude(pk=record.pk)
@@ -2924,7 +2984,7 @@ def cap_nhat_luan_chuyen_ben_ngoai_view(request, ma_luan_chuyen):
         .exists()
     )
     if duplicate_record:
-        return JsonResponse({"success": False, "message": "Van ban nay da co ban ghi cho noi nhan da chon."}, status=400)
+        return JsonResponse({"success": False, "message": "Văn bản này đã có bản ghi cho nơi nhận đã chọn."}, status=400)
 
     record.ma_noi_nhan = recipient
     record.ghi_chu = request.POST.get("ghi_chu", "").strip()
@@ -2933,7 +2993,7 @@ def cap_nhat_luan_chuyen_ben_ngoai_view(request, ma_luan_chuyen):
     return JsonResponse(
         {
             "success": True,
-            "message": "Da cap nhat thong tin phat hanh ben ngoai.",
+            "message": "Đã cập nhật thông tin phát hành bên ngoài.",
             "record": serialize_external_dispatch_record(record),
         }
     )
@@ -2947,9 +3007,9 @@ def danh_dau_da_gui_luan_chuyen_ben_ngoai_view(request, ma_luan_chuyen):
         allowed=(giao_vien is None or is_van_thu(giao_vien)),
     )
     if denied_response:
-        return JsonResponse({"success": False, "message": "Ban khong co quyen cap nhat phat hanh ben ngoai."}, status=403)
+        return JsonResponse({"success": False, "message": "Bạn không có quyền cập nhật phát hành bên ngoài."}, status=403)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     record = get_object_or_404(
         LuanChuyenBenNgoai.objects.select_related("ma_vb_di", "ma_vb_di__ma_loai_vb", "ma_noi_nhan", "nguoi_thuc_hien"),
@@ -3115,7 +3175,7 @@ def cap_nhat_noi_nhan_view(request, ma_noi_nhan):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da cap nhat noi nhan {recipient.ten_noi_nhan}.",
+            "message": f"Đã cập nhật nơi nhận {recipient.ten_noi_nhan}.",
             "recipient": serialize_recipient(recipient),
         }
     )
@@ -3126,9 +3186,9 @@ def them_giao_vien_view(request):
     giao_vien = getattr(request.user, "ho_so_giao_vien", None)
     denied_response = deny_if_no_permission(request, allowed=can_manage_accounts(giao_vien))
     if denied_response:
-        return JsonResponse({"success": False, "message": "Ban khong co quyen them giao vien."}, status=403)
+        return JsonResponse({"success": False, "message": "Bạn không có quyền thêm giáo viên"}, status=403)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ"}, status=405)
 
     form = ThemGiaoVienForm(request.POST)
     if not form.is_valid():
@@ -3153,11 +3213,11 @@ def them_giao_vien_view(request):
 @login_required
 def cap_nhat_ho_so_ca_nhan_view(request):
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ"}, status=405)
 
     giao_vien = getattr(request.user, "ho_so_giao_vien", None)
     if giao_vien is None:
-        return JsonResponse({"success": False, "message": "Tai khoan hien tai chua co ho so giao vien."}, status=400)
+        return JsonResponse({"success": False, "message": "Tài khoản hiện tại chưa có hồ sơ giáo viên"}, status=400)
 
     form = HoSoCaNhanForm(request.POST, instance=giao_vien)
     if not form.is_valid():
@@ -3172,7 +3232,7 @@ def cap_nhat_ho_so_ca_nhan_view(request):
     return JsonResponse(
         {
             "success": True,
-            "message": "Da cap nhat thong tin ca nhan.",
+            "message": "Đã cập nh thông tin cá nhân.",
             "profile": serialize_personal_profile(giao_vien),
         }
     )
@@ -3181,7 +3241,7 @@ def cap_nhat_ho_so_ca_nhan_view(request):
 @login_required
 def doi_mat_khau_ca_nhan_view(request):
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     form = DoiMatKhauCaNhanForm(request.POST, user=request.user)
     if not form.is_valid():
@@ -3191,7 +3251,7 @@ def doi_mat_khau_ca_nhan_view(request):
     request.user.set_password(form.cleaned_data["mat_khau_moi"])
     request.user.save(update_fields=["password"])
     update_session_auth_hash(request, request.user)
-    return JsonResponse({"success": True, "message": "Da doi mat khau thanh cong."})
+    return JsonResponse({"success": True, "message": "Đã đổi mật khẩu thành công."})
 
 
 @login_required
@@ -3199,9 +3259,9 @@ def cap_nhat_tai_khoan_giao_vien_view(request, ma_gv):
     giao_vien = getattr(request.user, "ho_so_giao_vien", None)
     denied_response = deny_if_no_permission(request, allowed=can_manage_accounts(giao_vien))
     if denied_response:
-        return JsonResponse({"success": False, "message": "Ban khong co quyen cap nhat tai khoan."}, status=403)
+        return JsonResponse({"success": False, "message": "Bạn không có quyền truy cập tài khoản."}, status=403)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     giao_vien_duoc_sua = get_object_or_404(GiaoVien.objects.select_related("ma_to", "user"), pk=ma_gv)
     form = GiaoVienTaiKhoanForm(request.POST, instance=giao_vien_duoc_sua)
@@ -3217,7 +3277,7 @@ def cap_nhat_tai_khoan_giao_vien_view(request, ma_gv):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da cap nhat tai khoan giao vien {giao_vien_duoc_sua.ho_ten}.",
+            "message": f"Đã cập nhật tài khoản giáo viên {giao_vien_duoc_sua.ho_ten}.",
             "teacher": serialize_teacher_account(giao_vien_duoc_sua),
         }
     )
@@ -3228,16 +3288,16 @@ def reset_mat_khau_giao_vien_view(request, ma_gv):
     giao_vien = getattr(request.user, "ho_so_giao_vien", None)
     denied_response = deny_if_no_permission(request, allowed=can_manage_accounts(giao_vien))
     if denied_response:
-        return JsonResponse({"success": False, "message": "Ban khong co quyen reset mat khau."}, status=403)
+        return JsonResponse({"success": False, "message": "Bạn không có quyền reset mật khẩu."}, status=403)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ."}, status=405)
 
     mat_khau_moi = request.POST.get("password", "")
     nhap_lai_mat_khau = request.POST.get("confirm_password", "")
     if not mat_khau_moi:
-        return JsonResponse({"success": False, "message": "Vui long nhap mat khau moi."}, status=400)
+        return JsonResponse({"success": False, "message": "Vui lòng nhập mật khẩu mới."}, status=400)
     if mat_khau_moi != nhap_lai_mat_khau:
-        return JsonResponse({"success": False, "message": "Mat khau nhap lai khong khop."}, status=400)
+        return JsonResponse({"success": False, "message": "Mật khẩu nhập lại không khớp."}, status=400)
 
     giao_vien_duoc_reset = get_object_or_404(GiaoVien.objects.select_related("user"), pk=ma_gv)
     giao_vien_duoc_reset.ensure_user_account()
@@ -3247,7 +3307,7 @@ def reset_mat_khau_giao_vien_view(request, ma_gv):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da reset mat khau cho giao vien {giao_vien_duoc_reset.ho_ten}.",
+            "message": f"Đã reset mật khẩu cho giáo viên {giao_vien_duoc_reset.ho_ten}.",
         }
     )
 
@@ -3279,9 +3339,9 @@ def cap_nhat_phan_quyen_nguoi_dung_view(request, ma_gv):
     giao_vien = getattr(request.user, "ho_so_giao_vien", None)
     denied_response = deny_if_no_permission(request, allowed=can_manage_accounts(giao_vien))
     if denied_response:
-        return JsonResponse({"success": False, "message": "Ban khong co quyen phan quyen nguoi dung."}, status=403)
+        return JsonResponse({"success": False, "message": "Bạn không có quyền phân quyền người dùng."}, status=403)
     if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Phuong thuc khong hop le."}, status=405)
+        return JsonResponse({"success": False, "message": "Phương thức không hợp lệ"}, status=405)
 
     giao_vien_duoc_phan_quyen = get_object_or_404(GiaoVien.objects.select_related("user"), pk=ma_gv)
     form = PhanQuyenNguoiDungForm(request.POST)
@@ -3298,7 +3358,7 @@ def cap_nhat_phan_quyen_nguoi_dung_view(request, ma_gv):
     return JsonResponse(
         {
             "success": True,
-            "message": f"Da cap nhat phan quyen cho giao vien {giao_vien_duoc_phan_quyen.ho_ten}.",
+            "message": f"Đã cập nhật phân quyền giáo viên {giao_vien_duoc_phan_quyen.ho_ten}.",
             "teacher": serialize_teacher_account(giao_vien_duoc_phan_quyen),
         }
     )

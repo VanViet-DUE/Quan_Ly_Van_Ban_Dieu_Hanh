@@ -8,10 +8,10 @@
 {% endblock %}
 
 {% block sidebar %}
-    <a class="combo-button{% if is_account_user_list %} active{% endif %}" href="{% url 'danh_sach_nguoi_dung' %}">
+    <a class="combo-button{% if is_account_user_list %} active{% endif %}" id="userlist" href="{% url 'danh_sach_nguoi_dung' %}" >
         <label>Danh sách người dùng</label>
     </a>
-    <a class="combo-button{% if is_account_permission_list %} active{% endif %}" href="{% url 'phan_quyen_nguoi_dung' %}">
+    <a class="combo-button{% if is_account_permission_list %} active{% endif %}" id="phanquyen" href="{% url 'phan_quyen_nguoi_dung' %}" >
         <label>Phân quyền người dùng</label>
     </a>
 {% endblock %}

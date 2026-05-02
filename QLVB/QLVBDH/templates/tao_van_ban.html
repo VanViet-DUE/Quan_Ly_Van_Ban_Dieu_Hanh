@@ -7,7 +7,16 @@
     <link rel="stylesheet" href="{% static 'css/tao_van_ban.css' %}">
 {% endblock %}
 
-{% block sidebar %}{% endblock %}
+{% block sidebar %}
+    <a class="combo-button active" id="taomoi" href="{% url 'tao_van_ban' %}">
+        <label>Tạo mới văn bản</label>
+    </a>
+    {% if ui_permissions.can_document_list_created %}
+        <a class="combo-button{% if is_created_document_list %} active{% endif %}" id="vanbandatao" href="{% url 'van_ban_da_tao' %}">
+            <label>Danh sách văn bản đã tạo</label>
+        </a>
+    {% endif %}
+{% endblock %}
 
 {% block content %}
     <div class="document-wrapper">

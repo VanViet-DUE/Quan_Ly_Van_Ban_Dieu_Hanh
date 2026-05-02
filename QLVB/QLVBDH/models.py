@@ -254,9 +254,9 @@ class LoaiVanBan(models.Model):
 
 class MauVanBan(models.Model):
     class TrangThai(models.TextChoices):
-        DANG_SU_DUNG = "Dang su dung", "Đang sử dụng"
-        DUNG_SU_DUNG = "Dung su dung", "Dừng sử dụngg"
-        DU_THAO = "Du thao", "Dự thảo"
+        DANG_SU_DUNG = "Đang sử dụng", "Đang sử dụng"
+        DUNG_SU_DUNG = "Dừng sử dụng", "Dừng sử dụng"
+        DU_THAO = "Dự thảo", "Dự thảo"
 
     TRANG_THAI_DANG_SU_DUNG = TrangThai.DANG_SU_DUNG
     TRANG_THAI_DUNG_SU_DUNG = TrangThai.DUNG_SU_DUNG
@@ -714,9 +714,9 @@ class PhanCongXuLy(models.Model):
 
 class LuanChuyenBenNgoai(models.Model):
     class TrangThaiGui(models.TextChoices):
-        DA_GUI = "Da gui", "Da gui"
-        GUI_LOI = "Gui loi", "Gui loi"
-        CHO_GUI = "Cho gui", "Cho gui"
+        DA_GUI = "Da gui", "Đã gửi"
+        GUI_LOI = "Gui loi", "Gửi lỗi"
+        CHO_GUI = "Cho gui", "Chờ gửi"
 
     ma_luan_chuyen = models.CharField(max_length=10, primary_key=True, blank=True)
     ma_vb_di = models.ForeignKey(

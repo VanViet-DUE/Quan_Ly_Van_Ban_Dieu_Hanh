@@ -263,24 +263,24 @@ header {
 }
 
 :root {
-    --status-pending-bg: #f59e0b;
-    --status-pending-text: #ffffff;
-    --status-pending-border: #f59e0b;
-    --status-progress-bg: #3b82f6;
-    --status-progress-text: #ffffff;
-    --status-progress-border: #3b82f6;
-    --status-review-bg: #8b5cf6;
-    --status-review-text: #ffffff;
-    --status-review-border: #8b5cf6;
-    --status-edit-bg: #ef4444;
-    --status-edit-text: #ffffff;
-    --status-edit-border: #ef4444;
-    --status-done-bg: #22c55e;
-    --status-done-text: #ffffff;
-    --status-done-border: #22c55e;
-    --status-published-bg: #16a34a;
-    --status-published-text: #ffffff;
-    --status-published-border: #16a34a;
+    --status-pending-bg: #fef3c7;
+    --status-pending-text: #92400e;
+    --status-pending-border: #fcd34d;
+    --status-progress-bg: #dbeafe;
+    --status-progress-text: #1d4ed8;
+    --status-progress-border: #93c5fd;
+    --status-review-bg: #ede9fe;
+    --status-review-text: #6d28d9;
+    --status-review-border: #c4b5fd;
+    --status-edit-bg: #fee2e2;
+    --status-edit-text: #b91c1c;
+    --status-edit-border: #fca5a5;
+    --status-done-bg: #dcfce7;
+    --status-done-text: #166534;
+    --status-done-border: #86efac;
+    --status-published-bg: #d1fae5;
+    --status-published-text: #047857;
+    --status-published-border: #6ee7b7;
 }
 
 .status-badge {
@@ -290,7 +290,7 @@ header {
     min-width: 136px;
     padding: 7px 16px;
     border-radius: 999px;
-    border: 0;
+    border: 1px solid transparent;
     font-size: 12px;
     font-weight: 700;
     line-height: 1.2;

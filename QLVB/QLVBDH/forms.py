@@ -161,6 +161,7 @@ class VanBanDenUpdateForm(forms.ModelForm):
             "ten_loai_vb"
         )
         self.fields["ma_muc_do"].queryset = MucDoUuTien.objects.order_by("muc_do")
+        self.fields["trang_thai_vb_den"].required = False
         self.fields["ma_loai_vb"].empty_label = "Chọn loại văn bản"
         self.fields["ma_muc_do"].empty_label = "Chọn mức độ ưu tiên"
         self.fields["ngay_nhan"].widget.attrs.update({"placeholder": "Chọn ngày nhận văn bản"})
@@ -175,6 +176,12 @@ class VanBanDenUpdateForm(forms.ModelForm):
         self.fields["tep_dinh_kem_uploads"].widget.attrs.update(
             {"class": "sr-only", "accept": ".pdf,.doc,.docx,image/*", "multiple": True, "id": "m-attachment-upload"}
         )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not cleaned_data.get("trang_thai_vb_den"):
+            cleaned_data["trang_thai_vb_den"] = self.instance.trang_thai_vb_den
+        return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -311,12 +318,12 @@ class VanBanDiDangKyForm(forms.ModelForm):
         ]
         widgets = {
             "ngay_ky": forms.DateInput(
-                attrs={"type": "date", "class": "form-control", "placeholder": "Chon ngay ky van ban"}
+                attrs={"type": "date", "class": "form-control", "placeholder": "Chọn ngày ký văn bản"}
             ),
             "so_ky_hieu": forms.TextInput(
                 attrs={
                     "class": "form-control",
-                    "placeholder": "So ky hieu duoc cap tu dong khi luu dang ky",
+                    "placeholder": "Số ký hiệu được cấp tự động khi lưu đăng ký",
                     "readonly": "readonly",
                 }
             ),
@@ -324,9 +331,9 @@ class VanBanDiDangKyForm(forms.ModelForm):
             "ma_muc_do": forms.Select(attrs={"class": "form-control"}),
             "nguoi_tao": forms.Select(attrs={"class": "form-control"}),
             "nguoi_ky": forms.Select(attrs={"class": "form-control"}),
-            "noi_nhan": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nhap noi nhan"}),
+            "noi_nhan": forms.TextInput(attrs={"class": "form-control", "placeholder": "Nhập nơi nhận"}),
             "trich_yeu": forms.Textarea(
-                attrs={"class": "form-control", "rows": 4, "placeholder": "Nhap trich yeu van ban"}
+                attrs={"class": "form-control", "rows": 4, "placeholder": "Nhập trích yếu văn bản"}
             ),
         }
 
@@ -342,10 +349,10 @@ class VanBanDiDangKyForm(forms.ModelForm):
         self.fields["ma_muc_do"].queryset = MucDoUuTien.objects.order_by("muc_do")
         self.fields["nguoi_tao"].queryset = GiaoVien.objects.order_by("ho_ten")
         self.fields["nguoi_ky"].queryset = GiaoVien.objects.order_by("ho_ten")
-        self.fields["ma_loai_vb"].empty_label = "Chon loai van ban"
-        self.fields["ma_muc_do"].empty_label = "Chon muc do uu tien"
-        self.fields["nguoi_tao"].empty_label = "Chon nguoi soan thao"
-        self.fields["nguoi_ky"].empty_label = "Chon nguoi ky"
+        self.fields["ma_loai_vb"].empty_label = "Chọn loại văn bản"
+        self.fields["ma_muc_do"].empty_label = "Chọn mức dộ ưu tiên"
+        self.fields["nguoi_tao"].empty_label = "Chọn người soạn thảo"
+        self.fields["nguoi_ky"].empty_label = "Chọn người ký"
         self.fields["ma_loai_vb"].widget.attrs.update({"class": "form-control"})
         self.fields["ma_muc_do"].widget.attrs.update({"class": "form-control"})
         self.fields["nguoi_tao"].widget.attrs.update({"class": "form-control"})
@@ -353,12 +360,12 @@ class VanBanDiDangKyForm(forms.ModelForm):
         self.fields["ngay_ky"].required = False
         self.fields["so_ky_hieu"].required = False
         self.fields["ban_chinh_thuc"].required = False
-        self.fields["ban_chinh_thuc"].label = "File chinh thuc"
+        self.fields["ban_chinh_thuc"].label = "File chính thức"
         self.fields["ban_chinh_thuc"].widget = forms.FileInput(
             attrs={"class": "sr-only", "accept": ".pdf,.doc,.docx,image/*", "id": "id_ban_chinh_thuc"}
         )
         self.fields["tep_dinh_kem_uploads"].required = False
-        self.fields["tep_dinh_kem_uploads"].label = "Them tep dinh kem"
+        self.fields["tep_dinh_kem_uploads"].label = "Thêm tệp đính kèm"
         self.fields["tep_dinh_kem_uploads"].widget.attrs.update(
             {"class": "sr-only", "accept": ".pdf,.doc,.docx,image/*", "multiple": True, "id": "id_tep_dinh_kem"}
         )
@@ -385,7 +392,7 @@ class VanBanDiDangKyForm(forms.ModelForm):
             return cleaned_data
 
         if not cleaned_data.get("ban_chinh_thuc") and not self.instance.ban_chinh_thuc:
-            raise forms.ValidationError("Vui long tai len file chinh thuc.")
+            raise forms.ValidationError("Vui lòng tải lên file chinh thức.")
 
         fallback_fields = ["ngay_ky", "ma_muc_do", "noi_nhan", "trich_yeu", "so_ky_hieu"]
         for field_name in fallback_fields:
@@ -441,8 +448,8 @@ class TaoVanBanDiForm(forms.ModelForm):
             "ten_loai_vb"
         )
         self.fields["ma_muc_do"].queryset = MucDoUuTien.objects.order_by("muc_do")
-        self.fields["ma_loai_vb"].empty_label = "Chon loai van ban"
-        self.fields["ma_muc_do"].empty_label = "Chon muc do uu tien"
+        self.fields["ma_loai_vb"].empty_label = "Chọn loại văn bản"
+        self.fields["ma_muc_do"].empty_label = "Chọn mức độ ưu tiên"
         self.fields["ma_loai_vb"].widget.attrs.update({"class": "form-control", "id": "loai-van-ban"})
         self.fields["ma_muc_do"].widget.attrs.update({"class": "form-control", "id": "muc-do-uu-tien"})
         self.fields["noi_nhan"].widget.attrs.update({"class": "form-control", "id": "noi-nhan"})
@@ -450,14 +457,14 @@ class TaoVanBanDiForm(forms.ModelForm):
         self.fields["ban_du_thao_uploads"].widget.attrs.update(
             {"class": "sr-only", "id": "id_ban_du_thao", "accept": ".pdf,.doc,.docx,image/*", "multiple": True}
         )
-        self.fields["ban_du_thao_uploads"].label = "Tai file du thao"
+        self.fields["ban_du_thao_uploads"].label = "Tải file dự thảo"
 
     def clean(self):
         cleaned_data = super().clean()
         if self.giao_vien is None:
-            raise forms.ValidationError("Tai khoan hien tai chua duoc lien ket voi giao vien.")
+            raise forms.ValidationError("Tài khoản hiện chưa được liên kết với giáo viên.")
         if not (cleaned_data.get("ban_du_thao_uploads") or []):
-            raise forms.ValidationError("Vui long tai len it nhat mot file du thao.")
+            raise forms.ValidationError("Vui lòng tải lên ít nhất một file dự thảo.")
         return cleaned_data
 
     def save(self, commit=True):
@@ -509,7 +516,7 @@ class ThemMauVanBanForm(forms.ModelForm):
         self.fields["ma_loai_vb"].queryset = LoaiVanBan.objects.filter(ap_dung__in=OUTGOING_AP_DUNG_VALUES).order_by(
             "ten_loai_vb"
         )
-        self.fields["ma_loai_vb"].empty_label = "Chon loai van ban"
+        self.fields["ma_loai_vb"].empty_label = "Chọn loại văn bản"
         self.fields["ma_loai_vb"].widget.attrs.update({"class": "form-control", "id": "loai-van-ban-mau"})
 
 

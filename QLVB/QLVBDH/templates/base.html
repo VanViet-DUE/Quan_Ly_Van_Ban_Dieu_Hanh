@@ -47,7 +47,7 @@
             {% if ui_permissions.can_view_incoming_outgoing %}
                 <a class="combo-button{% if active_menu == 'incoming_text' %} active{% endif %}" href="{% url 'danh_sach_van_ban_den' %}">
                     <i class="bi bi-file-earmark-plus"></i>
-                    <label>văn bản đến</label>
+                    <label>Văn bản đến</label>
                 </a>
 
                 <a class="combo-button{% if active_menu == 'outgoing_text' %} active{% endif %}" href="{% url 'danh_sach_van_ban_di' %}">
@@ -132,7 +132,7 @@
             </div>
         </div>
 
-        <footer class="page-footer">@Thuc hien boi nhom 3</footer>
+        <footer class="page-footer">@Thuc hien boi nhom 9</footer>
     </div>
 
     <div id="logout-confirm-modal" class="logout-modal-overlay hidden">
@@ -238,10 +238,20 @@
                 const normalized = normalizeStatus(status);
                 if (!normalized) return "";
                 if (normalized.includes("ban hanh")) return "status-theme-published";
-                if (normalized.includes("hoan thanh") || normalized.includes("da duyet") || normalized.includes("da chinh sua")) {
+                if (
+                    normalized.includes("hoan thanh") ||
+                    normalized.includes("da duyet") ||
+                    normalized.includes("da chinh sua") ||
+                    normalized.includes("da phan cong") ||
+                    normalized.includes("da gui")
+                ) {
                     return "status-theme-done";
                 }
-                if (normalized.includes("dang chinh sua") || normalized.includes("cho chinh sua")) return "status-theme-edit";
+                if (
+                    normalized.includes("dang chinh sua") ||
+                    normalized.includes("cho chinh sua") ||
+                    normalized.includes("gui loi")
+                ) return "status-theme-edit";
                 if (normalized.includes("cho duyet") || normalized.includes("uy quyen")) return "status-theme-review";
                 if (normalized.includes("dang xu ly") || normalized.includes("cho luan chuyen")) return "status-theme-progress";
                 if (
@@ -249,7 +259,8 @@
                     normalized.includes("cho xu ly") ||
                     normalized.includes("du thao") ||
                     normalized.includes("cho dang ky") ||
-                    normalized.includes("chua phan cong")
+                    normalized.includes("chua phan cong") ||
+                    normalized.includes("cho gui")
                 ) {
                     return "status-theme-pending";
                 }

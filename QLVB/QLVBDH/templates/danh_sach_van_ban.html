@@ -8,12 +8,18 @@
 {% endblock %}
 
 {% block sidebar %}
-    <a class="combo-button{% if is_published_document_list %} active{% endif %}" id="vanbandabanhanh" href="{% url 'van_ban_da_ban_hanh' %}">
-        <label>Đã ban hành</label>
-    </a>
-    {% if ui_permissions.can_document_list_created %}
-        <a class="combo-button{% if is_created_document_list %} active{% endif %}" id="vanbandatao" href="{% url 'van_ban_da_tao' %}">
-            <label>Đã tạo</label>
+    {% if is_created_document_list %}
+        <a class="combo-button" id="taomoi" href="{% url 'tao_van_ban' %}">
+            <label>Tạo mới văn bản</label>
+        </a>
+        {% if ui_permissions.can_document_list_created %}
+            <a class="combo-button active" id="vanbandatao" href="{% url 'van_ban_da_tao' %}">
+                <label>Danh sách văn bản đã tạo</label>
+            </a>
+        {% endif %}
+    {% else %}
+        <a class="combo-button{% if is_published_document_list %} active{% endif %}" id="vanbandabanhanh" href="{% url 'van_ban_da_ban_hanh' %}">
+            <label>Đã ban hành</label>
         </a>
     {% endif %}
 {% endblock %}

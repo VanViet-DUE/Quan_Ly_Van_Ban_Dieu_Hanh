@@ -125,7 +125,7 @@
             .filter((checkbox) => checkbox.checked)
             .map((checkbox) => checkbox.dataset.name);
         fields.donViDisplay.value = selectedNames.length ? selectedNames.join(", ") : "";
-        fields.donViDisplay.placeholder = selectedNames.length ? "" : "Chua chon nguoi xu ly";
+        fields.donViDisplay.placeholder = selectedNames.length ? "" : "Chưa chọn người xử lý";
     }
 
     function syncSelectFromCheckboxes() {
@@ -179,7 +179,7 @@
         resetPreview();
 
         if (!fileUrl) {
-            previewPlaceholder.textContent = "Van ban nay chua co file de xem truoc.";
+            previewPlaceholder.textContent = "Văn bản không có tệp đính kèm để xem trước.";
             previewPlaceholder.classList.remove("hidden");
             return;
         }
@@ -207,7 +207,7 @@
                 })
                 .then((arrayBuffer) => window.mammoth.convertToHtml({ arrayBuffer: arrayBuffer }))
                 .then((result) => {
-                    previewWord.innerHTML = result.value || "<p>Khong co noi dung de hien thi.</p>";
+                    previewWord.innerHTML = result.value || "<p>Không có nội dung để hiển thị</p>";
                     previewWord.classList.remove("hidden");
                 })
                 .catch(() => {
@@ -263,7 +263,7 @@
         }
 
         const badge = selectedRow.querySelector(".status-badge");
-        badge.textContent = "Da phan cong";
+                badge.textContent = "Đã phân công";
         badge.classList.add("assigned");
         if (window.applyStatusThemes) {
             window.applyStatusThemes();
@@ -298,7 +298,7 @@
         if (!emptyRow) {
             emptyRow = document.createElement("tr");
             emptyRow.dataset.searchEmpty = "true";
-            emptyRow.innerHTML = '<td colspan="8" class="empty-state">Khong tim thay van ban phu hop.</td>';
+            emptyRow.innerHTML = '<td colspan="8" class="empty-state">Không tìm thấy văn bản phù hợp.</td>';
             tableBody.appendChild(emptyRow);
         }
     }
@@ -421,15 +421,15 @@
         openConfirmButton.addEventListener("click", function () {
             const assignmentPayload = buildAssignmentPayload();
             if (!assignmentPayload.length) {
-                errorBox.textContent = "Vui long chon it nhat mot nguoi xu ly.";
+                errorBox.textContent = "Vui lòng chọn ít nhất một người xử lý.";
                 return;
             }
             if (assignmentPayload.some((item) => !item.instruction)) {
-                errorBox.textContent = "Vui long nhap noi dung chi dao cho tung nguoi xu ly.";
+                errorBox.textContent = "Vui lonng nhập nô dung chỉ đạo cho người xử lý";
                 return;
             }
             if (!fields.hanHoanThanh.value) {
-                errorBox.textContent = "Vui long chon thoi han xu ly.";
+                errorBox.textContent = "Vui lòng chọn thời hạn xử lý.";
                 return;
             }
             confirmModal.classList.add("show");
@@ -465,7 +465,7 @@
                     closeAllModals();
                 })
                 .catch((payload) => {
-                    errorBox.textContent = (payload && payload.message) || "Khong the luu phan cong xu ly.";
+                    errorBox.textContent = (payload && payload.message) || "Không thể lưu phân công xử lý.";
                     confirmModal.classList.remove("show");
                 });
         });

@@ -47,7 +47,7 @@
 
     function showPlaceholder(message) {
         hidePreviewElements();
-        placeholder.textContent = message || "Chua co file de xem truoc.";
+        placeholder.textContent = message || "Chưa có văn bản để xem trước.";
         placeholder.classList.remove("hidden");
     }
 
@@ -127,7 +127,7 @@
 
             selectedTemplateId.value = row.dataset.templateId || "";
             loaiVanBanSelect.value = row.dataset.loaiVbId || "";
-            draftFileName.value = row.dataset.fileName || "Nhan de tai file du thao";
+            draftFileName.value = row.dataset.fileName || "Nhân đề tài file dự thảo";
             previewUrl(row.dataset.fileUrl, row.dataset.fileName);
             closeModal();
         });
@@ -149,7 +149,7 @@
     resetFormButton.addEventListener("click", function () {
         window.setTimeout(function () {
             selectedTemplateId.value = "";
-            draftFileName.value = "Nhan de tai file du thao";
+            draftFileName.value = "Nhân đề tài file dự thảo";
             showPlaceholder();
         }, 0);
     });

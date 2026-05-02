@@ -166,7 +166,7 @@ function setupUserListPage(page, rows, buildUrl) {
             const data = await response.json();
             if (!response.ok || !data.success) {
                 const errors = data.errors ? Object.values(data.errors).flat().join(" ") : data.message;
-                showFeedback(createFeedback, errors || "Khong the them giao vien.", "error");
+                showFeedback(createFeedback, errors || "Không thể thêm giáo viên", "error");
                 return;
             }
 
@@ -180,7 +180,7 @@ function setupUserListPage(page, rows, buildUrl) {
             createModal.classList.add("hidden");
             resetCreateForm();
         } catch (error) {
-            showFeedback(createFeedback, "Khong the them giao vien.", "error");
+            showFeedback(createFeedback, "Không thể thêm giáo viên.", "error");
         }
     }
 
@@ -204,7 +204,7 @@ function setupUserListPage(page, rows, buildUrl) {
             const data = await response.json();
             if (!response.ok || !data.success) {
                 const errors = data.errors ? Object.values(data.errors).flat().join(" ") : data.message;
-                showFeedback(detailFeedback, errors || "Khong the cap nhat tai khoan.", "error");
+                showFeedback(detailFeedback, errors || "Không thể cập nhật tài khoản. ", "error");
                 return;
             }
 
@@ -212,7 +212,7 @@ function setupUserListPage(page, rows, buildUrl) {
             fillModalFromRow(currentRow);
             showFeedback(detailFeedback, data.message, "success");
         } catch (error) {
-            showFeedback(detailFeedback, "Khong the cap nhat tai khoan.", "error");
+            showFeedback(detailFeedback, "Không thể cập nhật tài khoản.", "error");
         }
     }
 
@@ -237,7 +237,7 @@ function setupUserListPage(page, rows, buildUrl) {
             });
             const data = await response.json();
             if (!response.ok || !data.success) {
-                showFeedback(resetFeedback, data.message || "Khong the reset mat khau.", "error");
+                showFeedback(resetFeedback, data.message || "Không thể reset mật khẩu.", "error");
                 return;
             }
 
@@ -247,7 +247,7 @@ function setupUserListPage(page, rows, buildUrl) {
             resetModal.classList.add("hidden");
             showFeedback(detailFeedback, data.message, "success");
         } catch (error) {
-            showFeedback(resetFeedback, "Khong the reset mat khau.", "error");
+            showFeedback(resetFeedback, "Không thể reset mât khẩu.", "error");
         }
     }
 
@@ -341,7 +341,7 @@ function setupPermissionPage(page, rows, buildUrl) {
             const data = await response.json();
             if (!response.ok || !data.success) {
                 const errors = data.errors ? Object.values(data.errors).flat().join(" ") : data.message;
-                showFeedback(errors || "Khong the cap nhat phan quyen.", "error");
+                showFeedback(errors || "Không thể cập nhật phân quyền.", "error");
                 return;
             }
 
@@ -356,7 +356,7 @@ function setupPermissionPage(page, rows, buildUrl) {
             }
             showFeedback(data.message, "success");
         } catch (error) {
-            showFeedback("Khong the cap nhat phan quyen.", "error");
+            showFeedback("Không thể cập nhật phân quyền.", "error");
         }
     }
 

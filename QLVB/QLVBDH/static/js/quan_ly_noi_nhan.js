@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
             createModal.classList.add("hidden");
             resetCreateForm();
         } catch (error) {
-            showFeedback(createFeedback, "Khong the them noi nhan.", "error");
+            showFeedback(createFeedback, "Không thể thêm nơi nhận", "error");
         }
     }
 
@@ -172,14 +172,14 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const data = await response.json();
             if (!response.ok || !data.success) {
-                showFeedback(detailFeedback, data.message || "Khong the cap nhat noi nhan.", "error");
+                showFeedback(detailFeedback, data.message || "Khng thể cập nhật nơi nhận.", "error");
                 return;
             }
             applyRecipientDataToRow(currentRow, data.recipient);
             fillModalFromRow(currentRow);
             showFeedback(detailFeedback, data.message, "success");
         } catch (error) {
-            showFeedback(detailFeedback, "Khong the cap nhat noi nhan.", "error");
+            showFeedback(detailFeedback, "Không thể cập nhật nơi nhận.", "error");
         }
     }
 

@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
             if (!response.ok || !data.success) {
                 const errors = data.errors ? Object.values(data.errors).flat().join(" ") : data.message;
-                toggleFeedback(profileFeedback, errors || "Khong the cap nhat thong tin ca nhan.", "error");
+                toggleFeedback(profileFeedback, errors || "Không thể cập nhật thông tin cá nhân.", "error");
                 return;
             }
 
@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", () => {
             toggleEditMode(false);
             toggleFeedback(profileFeedback, data.message, "success");
         } catch (error) {
-            toggleFeedback(profileFeedback, "Khong the cap nhat thong tin ca nhan.", "error");
+            toggleFeedback(profileFeedback, "Không thể cập nhật thông tin cá nhân.", "error");
         }
     }
 
@@ -127,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             const data = await response.json();
             if (!response.ok || !data.success) {
-                toggleFeedback(passwordFeedback, data.message || "Khong the doi mat khau.", "error");
+                toggleFeedback(passwordFeedback, data.message || "Không thể đổi mật khẩu.", "error");
                 return;
             }
 
@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
             closeModal(passwordModal);
             toggleFeedback(profileFeedback, data.message, "success");
         } catch (error) {
-            toggleFeedback(passwordFeedback, "Khong the doi mat khau.", "error");
+            toggleFeedback(passwordFeedback, "Không thể đổi mật khẩu.", "error");
         }
     }
 

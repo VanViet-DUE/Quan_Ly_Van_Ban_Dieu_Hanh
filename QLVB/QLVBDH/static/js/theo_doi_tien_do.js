@@ -36,7 +36,7 @@
         if (!emptyRow) {
             emptyRow = document.createElement("tr");
             emptyRow.dataset.searchEmpty = "true";
-            emptyRow.innerHTML = '<td colspan="9" class="empty-state">Khong tim thay van ban phu hop.</td>';
+            emptyRow.innerHTML = '<td colspan="9" class="empty-state">Không tìm thấy văn bản phù hợp.</td>';
             tableBody.appendChild(emptyRow);
         }
     }

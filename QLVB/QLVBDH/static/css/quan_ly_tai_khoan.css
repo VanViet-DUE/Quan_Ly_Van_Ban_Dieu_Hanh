@@ -127,67 +127,83 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px;
-    background: #1b4e7b;
+    padding: 10px 15px;
+    background: #1a4b7c;
     color: #fff;
-    font-weight: 700;
+    font-weight: bold;
 }
 
 .modal-close {
     border: none;
     background: transparent;
     color: inherit;
-    font-size: 20px;
+    font-size: 24px;
     cursor: pointer;
 }
 
 .modal-body {
-    padding: 20px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 10px;
 }
 
 .modal-form-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .modal-form-group label {
     font-size: 14px;
     font-weight: 700;
-    color: #1e293b;
+    color: #1f2d3d;
 }
 
 .modal-input {
     width: 100%;
-    padding: 11px 12px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
     font-size: 14px;
+    font-family: Arial, sans-serif;
     background: #fff;
 }
 
 .modal-input.bg-gray {
-    background: #f8fafc;
+    background: #f9f9f9;
 }
 
 .modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    padding: 0 20px 20px;
+    padding: 0 15px 15px;
 }
 
 .btn-modal,
 .btn-inline {
     border: none;
-    border-radius: 10px;
-    padding: 11px 16px;
+    border-radius: 4px;
+    padding: 8px 20px;
     font-size: 14px;
     font-weight: 700;
     cursor: pointer;
+}
+#userlist:hover,
+#phanquyen:hover{
+    background-color: rgba(255, 255, 255, 0.267);
+}
+#userlist,
+#phanquyen
+#dsnoinhan{
+    border-radius: 0;
+    padding: 10px;
+}
+#dsnoinhan.active {
+    background-color: rgba(255, 255, 255, 0.267);
+    border-radius: 0;
+    padding: 10px;
 }
 
 .btn-sua,
@@ -211,7 +227,7 @@
 
 .modal-feedback {
     padding: 10px 12px;
-    border-radius: 10px;
+    border-radius: 4px;
     font-size: 14px;
     font-weight: 700;
 }

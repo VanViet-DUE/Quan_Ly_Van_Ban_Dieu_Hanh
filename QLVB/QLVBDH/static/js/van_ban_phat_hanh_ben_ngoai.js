@@ -107,10 +107,13 @@
         activeRow.dataset.noiNhan = record.noi_nhan_tong_hop || "";
         activeRow.dataset.maNoiNhan = record.ma_noi_nhan || "";
         activeRow.dataset.ghiChu = record.ghi_chu || "";
-        activeRow.dataset.trangThai = record.trang_thai || "";
+        activeRow.dataset.trangThai = record.trang_thai_raw || record.trang_thai || "";
         activeRow.dataset.thoiGianGui = record.thoi_gian_gui || "";
         activeRow.querySelector("td:nth-child(7)").textContent = record.noi_nhan_tong_hop || "";
         activeRow.querySelector("td:nth-child(8) .status-badge").textContent = record.trang_thai || "";
+        if (window.applyStatusThemes) {
+            window.applyStatusThemes();
+        }
     }
 
     tableBody.addEventListener("click", (event) => {

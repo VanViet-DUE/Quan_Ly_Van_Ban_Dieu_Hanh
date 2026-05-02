@@ -1,0 +1,315 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+
+title Use Case Diagram Chi Tiet - He thong Quan ly Van ban
+
+actor "Van thu" as VanThu
+actor "Hieu truong" as HieuTruong
+actor "Pho hieu truong" as PhoHieuTruong
+actor "To truong" as ToTruong
+
+rectangle "He thong Quan ly Van ban" {
+
+  package "1. Xac thuc va ho so" {
+    usecase "Dang nhap" as UC_Login
+    usecase "Dang xuat" as UC_Logout
+    usecase "Cap nhat ho so ca nhan" as UC_Profile
+    usecase "Doi mat khau" as UC_ChangePassword
+  }
+
+  package "2. Theo doi va tra cuu chung" {
+    usecase "Theo doi tinh trang van ban" as UC_StatusTracking
+    usecase "Tim kiem van ban" as UC_SearchDocs
+    usecase "Loc van ban theo trang thai/\nloai/muc do" as UC_FilterDocs
+    usecase "Xem danh sach van ban" as UC_ViewDocList
+    usecase "Xem chi tiet van ban" as UC_ViewDocDetail
+    usecase "Xem tep dinh kem van ban" as UC_ViewAttachments
+  }
+
+  package "3. Van ban den" {
+    usecase "Xem danh sach van ban den" as UC_ViewIncomingList
+    usecase "Tim kiem van ban den" as UC_SearchIncoming
+    usecase "Loc van ban den" as UC_FilterIncoming
+    usecase "Xem chi tiet van ban den" as UC_ViewIncomingDetail
+    usecase "Dang ky van ban den" as UC_RegisterIncoming
+    usecase "Cap nhat van ban den" as UC_UpdateIncoming
+    usecase "Ban hanh noi bo van ban den" as UC_InternalIncoming
+  }
+
+  package "4. Van ban di" {
+    usecase "Xem danh sach van ban di" as UC_ViewOutgoingList
+    usecase "Tim kiem van ban di" as UC_SearchOutgoing
+    usecase "Loc van ban di" as UC_FilterOutgoing
+    usecase "Xem chi tiet van ban di" as UC_ViewOutgoingDetail
+    usecase "Tao van ban di" as UC_CreateOutgoing
+    usecase "Cap nhat van ban di" as UC_UpdateOutgoing
+    usecase "Duyet van ban di" as UC_ApproveOutgoing
+    usecase "Yeu cau chinh sua van ban di" as UC_RequestRevision
+    usecase "Hoan thanh chinh sua van ban di" as UC_FinishRevision
+    usecase "Dang ky van ban di" as UC_RegisterOutgoing
+    usecase "Cap so van ban di" as UC_NumberOutgoing
+    usecase "Luan chuyen van ban di" as UC_RouteOutgoing
+    usecase "Phat hanh ben ngoai" as UC_ExternalDispatch
+    usecase "Cap nhat phat hanh ben ngoai" as UC_UpdateExternalDispatch
+    usecase "Danh dau da gui ben ngoai" as UC_MarkSentExternal
+    usecase "Ban hanh noi bo van ban di" as UC_InternalOutgoing
+    usecase "Xem danh sach van ban da tao" as UC_ViewCreatedList
+    usecase "Tim kiem van ban da tao" as UC_SearchCreated
+    usecase "Xem chi tiet van ban da tao" as UC_ViewCreatedDetail
+    usecase "Xem danh sach van ban da ban hanh" as UC_ViewPublishedList
+    usecase "Tim kiem van ban da ban hanh" as UC_SearchPublished
+    usecase "Xem chi tiet van ban da ban hanh" as UC_ViewPublishedDetail
+    usecase "Xem danh sach phat hanh ben ngoai" as UC_ViewExternalDispatchList
+    usecase "Tim kiem danh sach phat hanh ben ngoai" as UC_SearchExternalDispatch
+    usecase "Xem chi tiet phat hanh ben ngoai" as UC_ViewExternalDispatchDetail
+  }
+
+  package "5. Quan ly cong viec va xu ly" {
+    usecase "Xem danh sach van ban can phan cong" as UC_ViewAssignQueue
+    usecase "Tim kiem van ban can phan cong" as UC_SearchAssignQueue
+    usecase "Xem chi tiet van ban can phan cong" as UC_ViewAssignQueueDetail
+    usecase "Phan cong xu ly van ban" as UC_AssignProcessing
+    usecase "Xem danh sach van ban da phan cong" as UC_ViewAssignedList
+    usecase "Tim kiem van ban da phan cong" as UC_SearchAssignedList
+    usecase "Xem chi tiet van ban da phan cong" as UC_ViewAssignedDetail
+    usecase "Theo doi tien do xu ly" as UC_ProgressTracking
+    usecase "Xem chi tiet tien do xu ly" as UC_ProgressDetail
+    usecase "Tim kiem tien do xu ly" as UC_SearchProgress
+    usecase "Xem cong viec ca nhan" as UC_ViewPersonalTaskList
+    usecase "Tim kiem cong viec ca nhan" as UC_SearchPersonalTask
+    usecase "Xem chi tiet cong viec ca nhan" as UC_ViewPersonalTaskDetail
+    usecase "Cap nhat tien do xu ly ca nhan" as UC_UpdatePersonalProgress
+    usecase "Chuyen phan cong xu ly" as UC_ReassignTask
+    usecase "Xem danh sach van ban tra lai" as UC_ViewReturnedList
+    usecase "Tim kiem van ban tra lai" as UC_SearchReturned
+    usecase "Xem chi tiet van ban tra lai" as UC_ViewReturnedDetail
+  }
+
+  package "6. Quan tri he thong" {
+    usecase "Xem danh sach nguoi dung" as UC_ViewUserList
+    usecase "Tim kiem nguoi dung" as UC_SearchUsers
+    usecase "Xem chi tiet tai khoan nguoi dung" as UC_ViewUserDetail
+    usecase "Them tai khoan giao vien" as UC_CreateUser
+    usecase "Cap nhat tai khoan giao vien" as UC_UpdateUser
+    usecase "Reset mat khau nguoi dung" as UC_ResetPassword
+    usecase "Xem danh sach phan quyen nguoi dung" as UC_ViewRoleList
+    usecase "Cap nhat phan quyen nguoi dung" as UC_UpdateRole
+    usecase "Xem danh sach noi nhan" as UC_ViewRecipientList
+    usecase "Tim kiem noi nhan" as UC_SearchRecipients
+    usecase "Xem chi tiet noi nhan" as UC_ViewRecipientDetail
+    usecase "Them noi nhan" as UC_CreateRecipient
+    usecase "Cap nhat noi nhan" as UC_UpdateRecipient
+    usecase "Xem danh sach mau van ban" as UC_ViewTemplateList
+    usecase "Tim kiem mau van ban" as UC_SearchTemplates
+    usecase "Xem chi tiet mau van ban" as UC_ViewTemplateDetail
+    usecase "Them mau van ban" as UC_CreateTemplate
+    usecase "Cap nhat mau van ban" as UC_UpdateTemplate
+    usecase "Xoa mau van ban" as UC_DeleteTemplate
+  }
+}
+
+VanThu --> UC_Login
+VanThu --> UC_Logout
+VanThu --> UC_Profile
+VanThu --> UC_ChangePassword
+VanThu --> UC_StatusTracking
+VanThu --> UC_SearchDocs
+VanThu --> UC_FilterDocs
+VanThu --> UC_ViewDocList
+VanThu --> UC_ViewDocDetail
+VanThu --> UC_ViewAttachments
+VanThu --> UC_ViewIncomingList
+VanThu --> UC_SearchIncoming
+VanThu --> UC_FilterIncoming
+VanThu --> UC_ViewIncomingDetail
+VanThu --> UC_RegisterIncoming
+VanThu --> UC_UpdateIncoming
+VanThu --> UC_InternalIncoming
+VanThu --> UC_ViewOutgoingList
+VanThu --> UC_SearchOutgoing
+VanThu --> UC_FilterOutgoing
+VanThu --> UC_ViewOutgoingDetail
+VanThu --> UC_RegisterOutgoing
+VanThu --> UC_NumberOutgoing
+VanThu --> UC_RouteOutgoing
+VanThu --> UC_ExternalDispatch
+VanThu --> UC_UpdateExternalDispatch
+VanThu --> UC_MarkSentExternal
+VanThu --> UC_InternalOutgoing
+VanThu --> UC_ViewPublishedList
+VanThu --> UC_SearchPublished
+VanThu --> UC_ViewPublishedDetail
+VanThu --> UC_ViewExternalDispatchList
+VanThu --> UC_SearchExternalDispatch
+VanThu --> UC_ViewExternalDispatchDetail
+VanThu --> UC_ViewUserList
+VanThu --> UC_SearchUsers
+VanThu --> UC_ViewUserDetail
+VanThu --> UC_CreateUser
+VanThu --> UC_UpdateUser
+VanThu --> UC_ResetPassword
+VanThu --> UC_ViewRoleList
+VanThu --> UC_UpdateRole
+VanThu --> UC_ViewRecipientList
+VanThu --> UC_SearchRecipients
+VanThu --> UC_ViewRecipientDetail
+VanThu --> UC_CreateRecipient
+VanThu --> UC_UpdateRecipient
+VanThu --> UC_ViewTemplateList
+VanThu --> UC_SearchTemplates
+VanThu --> UC_ViewTemplateDetail
+VanThu --> UC_CreateTemplate
+VanThu --> UC_UpdateTemplate
+VanThu --> UC_DeleteTemplate
+
+HieuTruong --> UC_Login
+HieuTruong --> UC_Logout
+HieuTruong --> UC_Profile
+HieuTruong --> UC_ChangePassword
+HieuTruong --> UC_StatusTracking
+HieuTruong --> UC_SearchDocs
+HieuTruong --> UC_FilterDocs
+HieuTruong --> UC_ViewDocList
+HieuTruong --> UC_ViewDocDetail
+HieuTruong --> UC_ViewAttachments
+HieuTruong --> UC_ViewIncomingList
+HieuTruong --> UC_SearchIncoming
+HieuTruong --> UC_FilterIncoming
+HieuTruong --> UC_ViewIncomingDetail
+HieuTruong --> UC_ViewOutgoingList
+HieuTruong --> UC_SearchOutgoing
+HieuTruong --> UC_FilterOutgoing
+HieuTruong --> UC_ViewOutgoingDetail
+HieuTruong --> UC_ApproveOutgoing
+HieuTruong --> UC_RequestRevision
+HieuTruong --> UC_ViewAssignQueue
+HieuTruong --> UC_SearchAssignQueue
+HieuTruong --> UC_ViewAssignQueueDetail
+HieuTruong --> UC_AssignProcessing
+HieuTruong --> UC_ViewAssignedList
+HieuTruong --> UC_SearchAssignedList
+HieuTruong --> UC_ViewAssignedDetail
+HieuTruong --> UC_ProgressTracking
+HieuTruong --> UC_ProgressDetail
+HieuTruong --> UC_SearchProgress
+
+PhoHieuTruong --> UC_Login
+PhoHieuTruong --> UC_Logout
+PhoHieuTruong --> UC_Profile
+PhoHieuTruong --> UC_ChangePassword
+PhoHieuTruong --> UC_StatusTracking
+PhoHieuTruong --> UC_SearchDocs
+PhoHieuTruong --> UC_FilterDocs
+PhoHieuTruong --> UC_ViewDocList
+PhoHieuTruong --> UC_ViewDocDetail
+PhoHieuTruong --> UC_ViewAttachments
+PhoHieuTruong --> UC_ViewIncomingList
+PhoHieuTruong --> UC_SearchIncoming
+PhoHieuTruong --> UC_FilterIncoming
+PhoHieuTruong --> UC_ViewIncomingDetail
+PhoHieuTruong --> UC_ViewOutgoingList
+PhoHieuTruong --> UC_SearchOutgoing
+PhoHieuTruong --> UC_FilterOutgoing
+PhoHieuTruong --> UC_ViewOutgoingDetail
+PhoHieuTruong --> UC_ApproveOutgoing
+PhoHieuTruong --> UC_RequestRevision
+PhoHieuTruong --> UC_ViewAssignQueue
+PhoHieuTruong --> UC_SearchAssignQueue
+PhoHieuTruong --> UC_ViewAssignQueueDetail
+PhoHieuTruong --> UC_AssignProcessing
+PhoHieuTruong --> UC_ViewAssignedList
+PhoHieuTruong --> UC_SearchAssignedList
+PhoHieuTruong --> UC_ViewAssignedDetail
+PhoHieuTruong --> UC_ProgressTracking
+PhoHieuTruong --> UC_ProgressDetail
+PhoHieuTruong --> UC_SearchProgress
+
+ToTruong --> UC_Login
+ToTruong --> UC_Logout
+ToTruong --> UC_Profile
+ToTruong --> UC_ChangePassword
+ToTruong --> UC_StatusTracking
+ToTruong --> UC_SearchDocs
+ToTruong --> UC_FilterDocs
+ToTruong --> UC_ViewDocList
+ToTruong --> UC_ViewDocDetail
+ToTruong --> UC_ViewAttachments
+ToTruong --> UC_CreateOutgoing
+ToTruong --> UC_UpdateOutgoing
+ToTruong --> UC_ViewCreatedList
+ToTruong --> UC_SearchCreated
+ToTruong --> UC_ViewCreatedDetail
+ToTruong --> UC_ViewPublishedList
+ToTruong --> UC_SearchPublished
+ToTruong --> UC_ViewPublishedDetail
+ToTruong --> UC_ViewAssignQueue
+ToTruong --> UC_SearchAssignQueue
+ToTruong --> UC_ViewAssignQueueDetail
+ToTruong --> UC_AssignProcessing
+ToTruong --> UC_ViewAssignedList
+ToTruong --> UC_SearchAssignedList
+ToTruong --> UC_ViewAssignedDetail
+ToTruong --> UC_ProgressTracking
+ToTruong --> UC_ProgressDetail
+ToTruong --> UC_SearchProgress
+ToTruong --> UC_ViewPersonalTaskList
+ToTruong --> UC_SearchPersonalTask
+ToTruong --> UC_ViewPersonalTaskDetail
+ToTruong --> UC_UpdatePersonalProgress
+ToTruong --> UC_ReassignTask
+ToTruong --> UC_ViewReturnedList
+ToTruong --> UC_SearchReturned
+ToTruong --> UC_ViewReturnedDetail
+ToTruong --> UC_FinishRevision
+
+UC_ViewIncomingList .> UC_SearchIncoming : <<include>>
+UC_ViewIncomingList .> UC_FilterIncoming : <<include>>
+UC_ViewIncomingList .> UC_ViewIncomingDetail : <<include>>
+
+UC_ViewOutgoingList .> UC_SearchOutgoing : <<include>>
+UC_ViewOutgoingList .> UC_FilterOutgoing : <<include>>
+UC_ViewOutgoingList .> UC_ViewOutgoingDetail : <<include>>
+
+UC_ViewCreatedList .> UC_SearchCreated : <<include>>
+UC_ViewCreatedList .> UC_ViewCreatedDetail : <<include>>
+
+UC_ViewPublishedList .> UC_SearchPublished : <<include>>
+UC_ViewPublishedList .> UC_ViewPublishedDetail : <<include>>
+
+UC_ViewExternalDispatchList .> UC_SearchExternalDispatch : <<include>>
+UC_ViewExternalDispatchList .> UC_ViewExternalDispatchDetail : <<include>>
+
+UC_ViewAssignQueue .> UC_SearchAssignQueue : <<include>>
+UC_ViewAssignQueue .> UC_ViewAssignQueueDetail : <<include>>
+
+UC_ViewAssignedList .> UC_SearchAssignedList : <<include>>
+UC_ViewAssignedList .> UC_ViewAssignedDetail : <<include>>
+
+UC_ProgressTracking .> UC_SearchProgress : <<include>>
+UC_ProgressTracking .> UC_ProgressDetail : <<include>>
+
+UC_ViewPersonalTaskList .> UC_SearchPersonalTask : <<include>>
+UC_ViewPersonalTaskList .> UC_ViewPersonalTaskDetail : <<include>>
+
+UC_ViewReturnedList .> UC_SearchReturned : <<include>>
+UC_ViewReturnedList .> UC_ViewReturnedDetail : <<include>>
+
+UC_ViewUserList .> UC_SearchUsers : <<include>>
+UC_ViewUserList .> UC_ViewUserDetail : <<include>>
+
+UC_ViewRecipientList .> UC_SearchRecipients : <<include>>
+UC_ViewRecipientList .> UC_ViewRecipientDetail : <<include>>
+
+UC_ViewTemplateList .> UC_SearchTemplates : <<include>>
+UC_ViewTemplateList .> UC_ViewTemplateDetail : <<include>>
+
+UC_RegisterOutgoing .> UC_NumberOutgoing : <<include>>
+UC_ApproveOutgoing .> UC_RequestRevision : <<extend>>
+UC_ExternalDispatch .> UC_UpdateExternalDispatch : <<extend>>
+UC_ExternalDispatch .> UC_MarkSentExternal : <<extend>>
+UC_FinishRevision .> UC_UpdateOutgoing : <<include>>
+UC_ViewDocDetail .> UC_ViewAttachments : <<include>>
+
+@enduml

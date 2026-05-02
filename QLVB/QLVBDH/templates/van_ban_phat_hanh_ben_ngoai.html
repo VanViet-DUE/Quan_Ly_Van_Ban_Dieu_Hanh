@@ -55,7 +55,7 @@
                             data-so-ky-hieu="{{ document.so_ky_hieu }}"
                             data-trich-yeu="{{ document.trich_yeu }}"
                             data-noi-nhan="{{ document.noi_nhan_tong_hop }}"
-                            data-trang-thai="{{ document.trang_thai }}"
+                            data-trang-thai="{{ document.trang_thai_raw|default:document.trang_thai }}"
                             data-ma-noi-nhan="{{ document.ma_noi_nhan }}"
                             data-nguoi-thuc-hien="{{ document.nguoi_thuc_hien }}"
                             data-ghi-chu="{{ document.ghi_chu }}"

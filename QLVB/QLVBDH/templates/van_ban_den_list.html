@@ -23,7 +23,7 @@
         <div class="search-bar">
             <div class="search-input-wrapper">
                 <i class="bi bi-search search-icon"></i>
-                <input type="text" id="search-input" placeholder="Tim theo so den, so ky hieu, trich yeu...">
+                <input type="text" id="search-input" placeholder="Tim theo so den, so ky hieu, trich yeu, ngay/thang/nam...">
             </div>
             <button class="btn-xem" type="button" id="search-button">Xem</button>
         </div>
@@ -48,6 +48,7 @@
                             data-publish-url="{% url 'ban_hanh_noi_bo_van_ban_den' document.so_vb_den %}"
                             data-so-den="{{ document.so_vb_den }}"
                             data-trang-thai="{{ document.trang_thai_vb_den }}"
+                            data-da-phan-cong="{% if document.da_phan_cong %}1{% else %}0{% endif %}"
                             data-da-ban-hanh-noi-bo="{% if document.da_ban_hanh_noi_bo %}1{% else %}0{% endif %}"
                             data-ngay-nhan="{{ document.ngay_nhan|date:'d/m/Y' }}"
                             data-ngay-ky="{{ document.ngay_ky|date:'d/m/Y' }}"
@@ -157,7 +158,7 @@
                         </div>
                     </div>
                     <div class="form-group-full">
-                        <label>Tep dinh kem:</label>
+                        <label>Tệp đính kèm:</label>
                         <div class="attachment-list-view" id="m-attachment-list"></div>
                         <div class="attachment-upload-row">
                             <input type="file" id="m-attachment-upload" name="tep_dinh_kem_uploads" class="hidden-file-input" accept=".pdf,.doc,.docx,image/*" multiple>

@@ -101,8 +101,8 @@
         activeRow.dataset.chiDao = documentData.chi_dao || "";
         const statusCell = activeRow.querySelector('[data-col="tinh-trang"]');
         statusCell.textContent = documentData.tinh_trang_phan_cong;
-        statusCell.classList.toggle("status-done", documentData.tinh_trang_phan_cong === "Da phan cong");
-        statusCell.classList.toggle("status-pending", documentData.tinh_trang_phan_cong !== "Da phan cong");
+    statusCell.classList.toggle("status-done", documentData.tinh_trang_phan_cong === "Đã phân công");
+    statusCell.classList.toggle("status-pending", documentData.tinh_trang_phan_cong !== "Đã phân công");
     }
 
     function closeModal() {
@@ -161,12 +161,12 @@
                 return payload;
             })
             .then(function (payload) {
-                showNotification(payload.message || "Da cap nhat van ban.");
+                showNotification(payload.message || "Đã cập nhật văn bản.");
                 activeRow.remove();
                 closeModal();
             })
             .catch(function (payload) {
-                errorBox.textContent = (payload && payload.message) || "Khong the duyet van ban.";
+                errorBox.textContent = (payload && payload.message) || "Không thể duyệt văn bản.";
             });
     }
 
@@ -182,7 +182,7 @@
 
     submitRevisionButton.addEventListener("click", function () {
         if (!revisionText.value.trim()) {
-            revisionErrors.textContent = "Vui long nhap noi dung yeu cau chinh sua.";
+            revisionErrors.textContent = "Vui lòng nhập nội dung yêu cầu chỉnh sửa";
             return;
         }
         submitApprovalAction("request_revision", { yc_chinh_sua: revisionText.value.trim() });
@@ -196,7 +196,7 @@
 
     submitDelegateButton.addEventListener("click", function () {
         if (!delegateSelect.value) {
-            delegateErrors.textContent = "Vui long chon nguoi duoc uy quyen.";
+            delegateErrors.textContent = "Vui lòng chọn người ươ ủy quyền.";
             return;
         }
         submitApprovalAction("delegate", { delegate_id: delegateSelect.value });

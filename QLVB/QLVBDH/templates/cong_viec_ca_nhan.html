@@ -36,7 +36,7 @@
                     <thead>
                         <tr>
                             <th>STT</th>
-                            <th>Ngay ban hành</th>
+                            <th>Ngày ban hành</th>
                             <th>Số văn bản</th>
                             <th>Loại văn bản</th>
                             <th>Số ký hiệu</th>
@@ -69,7 +69,7 @@
                                 <td>{{ document.so_ky_hieu }}</td>
                                 <td>{{ document.trich_yeu }}</td>
                                 <td>{{ document.nguoi_phan_cong }}</td>
-                                <td class="text-center"><span class="status-badge">{{ document.trang_thai_xl }}</span></td>
+                                <td class="text-center"><span class="status-badge">{{ document.trang_thai_xl_hien_thi }}</span></td>
                             </tr>
                         {% empty %}
                             <tr><td colspan="8" class="empty-state">Không có văn bản nào trong mục xử lý.</td></tr>
@@ -107,7 +107,7 @@
                         <div class="form-group">
                             <label>Cập nhật tiến độ:</label>
                             <select id="p-trang-thai-xu-ly">
-                                <option value="Dang xu ly"Đang xử lý</option>
+                                <option value="Dang xu ly">Đang xử lý</option>
                                 <option value="Da hoan thanh">Đã hoàn thành</option>
                             </select>
                         </div>

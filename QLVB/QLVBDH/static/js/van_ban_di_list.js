@@ -73,6 +73,57 @@
             .toLowerCase();
     }
 
+    function normalizeSearchText(value) {
+        return (value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^0-9a-z]+/gi, " ")
+            .trim()
+            .toLowerCase();
+    }
+
+    function buildDateSearchTokens(dateValue) {
+        if (!dateValue || dateValue === "NULL") {
+            return [];
+        }
+
+        const normalizedDate = String(dateValue).trim();
+        const parts = normalizedDate.split("/");
+        if (parts.length !== 3) {
+            const normalizedToken = normalizeSearchText(normalizedDate);
+            return normalizedToken ? [normalizedToken] : [];
+        }
+
+        const [day, month, year] = parts;
+        return [
+            normalizedDate,
+            `${day}-${month}-${year}`,
+            `${year}-${month}-${day}`,
+            `${day} ${month} ${year}`,
+            `${year} ${month} ${day}`,
+            `${day}${month}${year}`,
+            `${year}${month}${day}`,
+            `ngay ${day} thang ${month} nam ${year}`,
+        ].map(normalizeSearchText);
+    }
+
+    function buildRowSearchText(row) {
+        return [
+            row.dataset.soDi,
+            row.dataset.ngayBanHanh,
+            row.dataset.ngayKy,
+            row.dataset.soKyHieu,
+            row.dataset.trichYeu,
+            row.dataset.noiNhan,
+            row.dataset.trangThai,
+            ...buildDateSearchTokens(row.dataset.ngayBanHanh),
+            ...buildDateSearchTokens(row.dataset.ngayKy),
+        ]
+            .map(normalizeSearchText)
+            .filter(Boolean)
+            .join(" ");
+    }
+
     function isPostRegistrationStatus(status) {
         const normalizedStatus = normalizeStatus(status);
         return ["da dang ky", "cho luan chuyen", "cho phan cong"].includes(normalizedStatus);
@@ -194,7 +245,12 @@
         internalPublishButton.textContent = hasInternalPublished ? "Ngừng ban hành" : "Ban hành nội bộ";
     }
 
+    function canEditDocument(row) {
+        return canManageDocuments && row && row.dataset.daPhanCong !== "1";
+    }
+
     function setEditMode(enabled) {
+        const canEditCurrentDocument = canEditDocument(activeRow);
         const editableInputs = editForm.querySelectorAll("input[name], textarea[name], select[name]");
         editableInputs.forEach(function (field) {
             if (field.id === "m-so-di") {
@@ -211,9 +267,9 @@
             }
 
             if (field.matches("select")) {
-                field.disabled = !enabled;
+                field.disabled = !enabled || !canEditCurrentDocument;
             } else {
-                if (enabled) {
+                if (enabled && canEditCurrentDocument) {
                     if (field.dataset.dateInput !== undefined) {
                         field.type = "date";
                         field.value = convertDisplayDateToInput(field.value);
@@ -230,22 +286,22 @@
                 }
             }
 
-            field.classList.toggle("editable", enabled);
+            field.classList.toggle("editable", enabled && canEditCurrentDocument);
         });
 
-        draftUploadTrigger.disabled = !enabled;
-        finalUploadTrigger.disabled = !enabled;
+        draftUploadTrigger.disabled = !enabled || !canEditCurrentDocument;
+        finalUploadTrigger.disabled = !enabled || !canEditCurrentDocument;
         if (officialAttachmentUploadTrigger) {
-            officialAttachmentUploadTrigger.disabled = !enabled;
+            officialAttachmentUploadTrigger.disabled = !enabled || !canEditCurrentDocument;
         }
         const signerDisplayField = document.getElementById("m-nguoi-ky-display");
         if (signerDisplayField) {
             signerDisplayField.classList.remove("hidden");
         }
         if (editButton) {
-            editButton.classList.toggle("hidden", enabled || !canManageDocuments);
+            editButton.classList.toggle("hidden", enabled || !canEditCurrentDocument);
         }
-        editActions.classList.toggle("hidden", !enabled);
+        editActions.classList.toggle("hidden", !enabled || !canEditCurrentDocument);
         const normalizedStatus = normalizeStatus(document.getElementById("m-trang-thai").value);
         const isWaitingRegister = normalizedStatus === "cho dang ky";
         const isReadyForPostRegistration = isPostRegistrationStatus(document.getElementById("m-trang-thai").value);
@@ -270,6 +326,7 @@
         const data = {
             soDi: row.dataset.soDi,
             trangThai: row.dataset.trangThai,
+            daPhanCong: row.dataset.daPhanCong === "1",
             ngayBanHanh: row.dataset.ngayBanHanh || "",
             ngayKy: row.dataset.ngayKy || "",
             soKyHieu: row.dataset.soKyHieu === "NULL" ? "" : row.dataset.soKyHieu,
@@ -340,20 +397,10 @@
             return;
         }
 
-        const keyword = (searchInput.value || "").trim().toLowerCase();
+        const keyword = normalizeSearchText(searchInput.value);
         const rows = tableBody.querySelectorAll("tr[data-update-url]");
         rows.forEach(function (row) {
-            const haystack = [
-                row.dataset.soDi,
-                row.dataset.ngayBanHanh,
-                row.dataset.ngayKy,
-                row.dataset.soKyHieu,
-                row.dataset.trichYeu,
-                row.dataset.noiNhan,
-                row.dataset.trangThai,
-            ]
-                .join(" ")
-                .toLowerCase();
+            const haystack = buildRowSearchText(row);
             row.classList.toggle("hidden", keyword !== "" && !haystack.includes(keyword));
         });
     }
@@ -364,6 +411,9 @@
         }
 
         activeRow.dataset.trangThai = documentData.trang_thai_vb_di;
+        if (documentData.da_phan_cong !== undefined) {
+            activeRow.dataset.daPhanCong = documentData.da_phan_cong ? "1" : "0";
+        }
         if (documentData.ngay_ban_hanh !== undefined) {
             activeRow.dataset.ngayBanHanh = documentData.ngay_ban_hanh;
         }

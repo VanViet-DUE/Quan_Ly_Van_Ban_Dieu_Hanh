@@ -326,6 +326,41 @@ class DangKyVanBanDenViewTests(TestCase):
             ["Van ban hoa toc", "Van ban thuong khan", "Van ban binh thuong"],
         )
 
+    def test_list_view_prioritizes_cho_phan_cong_documents_before_other_statuses(self):
+        hoa_toc = MucDoUuTien.objects.create(muc_do="Hoa toc")
+        binh_thuong = MucDoUuTien.objects.create(muc_do="Binh thuong")
+
+        VanBanDen.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            co_quan_ban_hanh="So Giao duc",
+            so_ky_hieu="01/XL",
+            ngay_ky="2026-03-20",
+            trich_yeu="Van ban dang xu ly moi nhat",
+            file_van_ban=SimpleUploadedFile("processing.pdf", b"%PDF-1.4 processing", content_type="application/pdf"),
+            trang_thai_vb_den=VanBanDen.TrangThai.CHO_XU_LY,
+            ngay_nhan="2026-03-31",
+            ma_muc_do=binh_thuong,
+        )
+        VanBanDen.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            co_quan_ban_hanh="So Giao duc",
+            so_ky_hieu="02/HT",
+            ngay_ky="2026-03-20",
+            trich_yeu="Van ban cho phan cong hoa toc",
+            file_van_ban=SimpleUploadedFile("pending-hot.pdf", b"%PDF-1.4 pending hot", content_type="application/pdf"),
+            trang_thai_vb_den=VanBanDen.TrangThai.CHO_PHAN_CONG,
+            ngay_nhan="2026-03-29",
+            ma_muc_do=hoa_toc,
+        )
+
+        response = self.client.get(reverse("danh_sach_van_ban_den"))
+
+        documents = response.context["documents"]
+        self.assertEqual(
+            [document.trich_yeu for document in documents[:2]],
+            ["Van ban cho phan cong hoa toc", "Van ban dang xu ly moi nhat"],
+        )
+
     def test_update_view_updates_document_and_returns_json(self):
         van_ban_den = VanBanDen.objects.create(
             ma_loai_vb=self.loai_van_ban,
@@ -441,11 +476,50 @@ class DangKyVanBanDenViewTests(TestCase):
         response = self.client.get(reverse("theo_doi_tinh_trang"))
 
         self.assertEqual(response.status_code, 200)
-        priority_card = next(card for card in response.context["dashboard_cards"] if card["title"] == "Văn bản ưu tiên")
-        self.assertEqual(
-            priority_card["items"],
-            [("Hỏa tốc:", 1), ("Thượng khẩn:", 1), ("Khẩn:", 0), ("Bình thường:", 0)],
+        priority_card = response.context["dashboard_cards"][3]
+        self.assertEqual([value for _, value in priority_card["items"]], [1, 1, 0, 0])
+
+
+    def test_theo_doi_tinh_trang_counts_outgoing_statuses_and_publish_summaries(self):
+        VanBanDi.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            nguoi_tao=self.hieu_truong,
+            trich_yeu="Van ban di da dang ky",
+            nguoi_ky=self.hieu_truong,
+            ngay_ky="2026-03-20",
+            noi_nhan="So Giao duc",
+            ban_du_thao=SimpleUploadedFile("outgoing-registered.pdf", b"%PDF-1.4 outgoing registered", content_type="application/pdf"),
+            trang_thai_vb_di=VanBanDi.TrangThai.DA_DANG_KY,
+            ngay_ban_hanh="2026-03-21",
+            ma_muc_do=self.muc_do,
+            so_ky_hieu="93/SGD",
+            da_phat_hanh_ben_ngoai=True,
         )
+        VanBanDi.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            nguoi_tao=self.hieu_truong,
+            trich_yeu="Van ban di da ban hanh",
+            nguoi_ky=self.hieu_truong,
+            ngay_ky="2026-03-20",
+            noi_nhan="So Giao duc",
+            ban_du_thao=SimpleUploadedFile("outgoing-complete.pdf", b"%PDF-1.4 outgoing complete", content_type="application/pdf"),
+            trang_thai_vb_di=VanBanDi.TrangThai.DA_BAN_HANH,
+            ngay_ban_hanh="2026-03-21",
+            ma_muc_do=self.muc_do,
+            so_ky_hieu="94/SGD",
+            da_ban_hanh_noi_bo=True,
+        )
+
+        response = self.client.get(reverse("theo_doi_tinh_trang"))
+
+        self.assertEqual(response.status_code, 200)
+        outgoing_card = response.context["dashboard_cards"][1]
+        outgoing_items = outgoing_card["items"]
+        self.assertEqual(outgoing_items[4][1], 1)
+        self.assertEqual(outgoing_items[6][1], 1)
+        self.assertEqual(outgoing_items[7][1], 1)
+        self.assertEqual(outgoing_items[8][1], 1)
+        self.assertEqual(len(outgoing_items), 9)
 
 
 @override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
@@ -535,7 +609,46 @@ class VanBanDiViewTests(TestCase):
         documents = response.context["documents"]
         self.assertEqual(
             [document.trich_yeu for document in documents[:3]],
-            ["Van ban di hoa toc", "Van ban di thuong khan", "Van ban di binh thuong"],
+            ["Van ban di binh thuong", "Van ban di thuong khan", "Van ban di hoa toc"],
+        )
+
+    def test_list_view_prioritizes_cho_phan_cong_outgoing_documents_before_other_statuses(self):
+        hoa_toc = MucDoUuTien.objects.create(muc_do="Hoa toc")
+        binh_thuong = MucDoUuTien.objects.create(muc_do="Binh thuong")
+
+        VanBanDi.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            nguoi_tao=self.nguoi_tao,
+            trich_yeu="Van ban di cho dang ky moi nhat",
+            nguoi_ky=self.nguoi_ky,
+            ngay_ky="2026-03-20",
+            noi_nhan="So Giao duc",
+            ban_du_thao=SimpleUploadedFile("register-out.pdf", b"%PDF-1.4 register", content_type="application/pdf"),
+            trang_thai_vb_di=VanBanDi.TrangThai.CHO_DANG_KY,
+            ngay_ban_hanh="2026-03-31",
+            ma_muc_do=binh_thuong,
+            so_ky_hieu="20/DK",
+        )
+        VanBanDi.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            nguoi_tao=self.nguoi_tao,
+            trich_yeu="Van ban di cho phan cong hoa toc",
+            nguoi_ky=self.nguoi_ky,
+            ngay_ky="2026-03-20",
+            noi_nhan="So Giao duc",
+            ban_du_thao=SimpleUploadedFile("pending-out.pdf", b"%PDF-1.4 pending", content_type="application/pdf"),
+            trang_thai_vb_di=VanBanDi.TrangThai.CHO_PHAN_CONG,
+            ngay_ban_hanh="2026-03-29",
+            ma_muc_do=hoa_toc,
+            so_ky_hieu="21/HT",
+        )
+
+        response = self.client.get(reverse("danh_sach_van_ban_di"))
+
+        documents = response.context["documents"]
+        self.assertEqual(
+            [document.trich_yeu for document in documents[:2]],
+            ["Van ban di cho phan cong hoa toc", "Van ban di cho dang ky moi nhat"],
         )
 
     def test_update_view_updates_document_and_returns_json(self):
@@ -1167,6 +1280,46 @@ class QuanLyCongViecTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, van_ban_den.so_vb_den)
         self.assertNotContains(response, van_ban_di.so_vb_di)
+
+    def test_chuyen_phan_cong_ca_nhan_hides_outgoing_document_from_personal_processing_list(self):
+        to_chuyen_mon = ToChuyenMon.objects.create(ten_to="To Ke hoach", to_truong=self.nguoi_duyet)
+        self.nguoi_duyet.ma_to = to_chuyen_mon
+        self.nguoi_duyet.save(update_fields=["ma_to"])
+        van_ban_di = VanBanDi.objects.create(
+            ma_loai_vb=self.loai_van_ban,
+            nguoi_tao=self.nguoi_tao,
+            trich_yeu="Van ban di chuyen phan cong",
+            nguoi_ky=self.nguoi_duyet,
+            ngay_ky="2026-03-20",
+            noi_nhan="Phong chuyen mon",
+            ban_du_thao=SimpleUploadedFile("transfer-draft.pdf", b"%PDF-1.4 draft", content_type="application/pdf"),
+            trang_thai_vb_di=VanBanDi.TrangThai.DA_DANG_KY,
+            ngay_ban_hanh="2026-03-21",
+            ma_muc_do=self.muc_do,
+            so_ky_hieu="42/SGD",
+            da_gui_phan_cong=True,
+        )
+        assignment = PhanCongXuLy.objects.create(
+            so_vb_di=van_ban_di,
+            nguoi_xu_ly=self.nguoi_duyet,
+            nguoi_phan_cong=self.nguoi_tao,
+            noi_dung_cd="Chuyen cho giao vien trong to.",
+            thoi_han="2026-03-31",
+            trang_thai_xl=PhanCongXuLy.TrangThaiXuLy.DANG_XU_LY,
+        )
+
+        response = self.client.post(reverse("chuyen_phan_cong_ca_nhan", args=[assignment.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        van_ban_di.refresh_from_db()
+        assignment.refresh_from_db()
+        self.assertEqual(van_ban_di.trang_thai_vb_di, VanBanDi.TrangThai.CHO_PHAN_CONG)
+        self.assertEqual(assignment.trang_thai_xl, PhanCongXuLy.TrangThaiXuLy.CHO_XU_LY)
+
+        list_response = self.client.get(reverse("van_ban_xu_ly_ca_nhan"))
+
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotContains(list_response, van_ban_di.so_vb_di)
 
     def test_nguoi_dung_to_chuc_trong_truong_duoc_phan_cong_cho_tat_ca_tru_ban_giam_hieu(self):
         nhom_to_chuc = Group.objects.create(name="Nguoi dung to chuc trong truong")

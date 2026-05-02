@@ -154,7 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (!response.ok || !data.success) {
                 const errors = data.errors ? Object.values(data.errors).flat().join(" ") : data.message;
-                showFeedback(errors || "Khong the cap nhat mau van ban.", "error");
+                showFeedback(errors || "Không thể cập nhật mẫu văn bản.", "error");
                 return;
             }
 
@@ -162,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
             fillModalFromRow(currentRow);
             showFeedback(data.message, "success");
         } catch (error) {
-            showFeedback("Khong the cap nhat mau van ban.", "error");
+            showFeedback("Không thể cập nhật mẫu văn bản", "error");
         }
     }
 
@@ -185,14 +185,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await response.json();
 
             if (!response.ok || !data.success) {
-                showFeedback(data.message || "Khong the xoa mau van ban.", "error");
+                showFeedback(data.message || "Không thể xóa mẫu văn bản.", "error");
                 return;
             }
 
             currentRow.remove();
             closeModal();
         } catch (error) {
-            showFeedback("Khong the xoa mau van ban.", "error");
+            showFeedback("Không thể xóa mẫu văn bản.", "error");
         }
     }
 

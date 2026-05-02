@@ -279,7 +279,7 @@
     }
 
     if (transferButton && csrfTokenInput) {
-        transferButton.textContent = "Gui phan cong";
+        transferButton.textContent = "Gửi phân công";
         transferButton.addEventListener("click", function () {
             fetch(transferButton.dataset.transferUrl, {
                 method: "POST",
@@ -299,7 +299,7 @@
                     window.location.reload();
                 })
                 .catch(function (payload) {
-                    window.alert((payload && payload.message) || "Khong the gui phan cong van ban.");
+                    window.alert((payload && payload.message) || "Không thể gửi phân công văn bản.");
                 });
         });
     }

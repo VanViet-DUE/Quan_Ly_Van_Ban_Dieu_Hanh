@@ -1,16 +1,19 @@
 .status-badge.status-received {
-    background-color: #f2994a;
-    color: #fff;
+    background-color: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
 }
 
 .status-badge.status-processing {
-    background-color: #f2c94c;
-    color: #333;
+    background-color: #dbeafe;
+    border-color: #93c5fd;
+    color: #1d4ed8;
 }
 
 .status-badge.status-complete {
-    background-color: #27ae60;
-    color: #fff;
+    background-color: #dcfce7;
+    border-color: #86efac;
+    color: #166534;
 }
 
 .progress-modal-content {

@@ -55,8 +55,65 @@
             .toLowerCase();
     }
 
+    function normalizeSearchText(value) {
+        return (value || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^0-9a-z]+/gi, " ")
+            .trim()
+            .toLowerCase();
+    }
+
+    function buildDateSearchTokens(dateValue) {
+        if (!dateValue) {
+            return [];
+        }
+
+        const normalizedDate = String(dateValue).trim();
+        const parts = normalizedDate.split("/");
+        if (parts.length !== 3) {
+            const normalizedToken = normalizeSearchText(normalizedDate);
+            return normalizedToken ? [normalizedToken] : [];
+        }
+
+        const [day, month, year] = parts;
+        return [
+            normalizedDate,
+            `${day}-${month}-${year}`,
+            `${year}-${month}-${day}`,
+            `${day} ${month} ${year}`,
+            `${year} ${month} ${day}`,
+            `${day}${month}${year}`,
+            `${year}${month}${day}`,
+            `ngay ${day} thang ${month} nam ${year}`,
+        ].map(normalizeSearchText);
+    }
+
+    function buildRowSearchText(row) {
+        return [
+            row.dataset.soDen,
+            row.dataset.ngayNhan,
+            row.dataset.ngayKy,
+            row.dataset.soKyHieu,
+            row.dataset.trichYeu,
+            row.dataset.coQuan,
+            row.dataset.trangThai,
+            row.dataset.loaiVb,
+            row.dataset.mucDo,
+            ...buildDateSearchTokens(row.dataset.ngayNhan),
+            ...buildDateSearchTokens(row.dataset.ngayKy),
+        ]
+            .map(normalizeSearchText)
+            .filter(Boolean)
+            .join(" ");
+    }
+
     function canEditStatus(status) {
         return normalizeStatus(status) === "cho phan cong";
+    }
+
+    function canEditDocument(row) {
+        return canManageDocuments && row && canEditStatus(row.dataset.trangThai);
     }
 
     function updateActionButtons(status, isEditing, isPublished) {
@@ -137,8 +194,8 @@
     }
 
     function setEditMode(enabled) {
-        const allowFullEdit = canManageDocuments && activeRow ? canEditStatus(activeRow.dataset.trangThai) : false;
-        const allowAttachmentEdit = canManageDocuments && Boolean(activeRow);
+        const allowFullEdit = canEditDocument(activeRow);
+        const allowAttachmentEdit = canEditDocument(activeRow);
         const editable = enabled && allowFullEdit;
         const attachmentEditable = enabled && allowAttachmentEdit;
         const editableInputs = editForm.querySelectorAll("input[name], textarea[name], select[name]");
@@ -147,6 +204,12 @@
                 return;
             }
             if (field.id === "m-attachment-upload" || field.id === "m-attachment-delete-ids") {
+                return;
+            }
+
+            if (field.id === "m-trang-thai") {
+                field.disabled = true;
+                field.classList.remove("editable");
                 return;
             }
 
@@ -181,7 +244,7 @@
             attachmentUploadTrigger.disabled = !attachmentEditable;
         }
         if (editButton) {
-            editButton.classList.toggle("hidden", enabled || !canManageDocuments);
+            editButton.classList.toggle("hidden", enabled || !canEditDocument(activeRow));
         }
         editActions.classList.toggle("hidden", !editable);
         renderAttachmentList(currentAttachments, attachmentEditable);
@@ -202,6 +265,7 @@
         const data = {
             soDen: row.dataset.soDen,
             trangThai: row.dataset.trangThai,
+            daPhanCong: row.dataset.daPhanCong === "1",
             daBanHanhNoiBo: row.dataset.daBanHanhNoiBo === "1",
             ngayNhan: row.dataset.ngayNhan,
             ngayKy: row.dataset.ngayKy,
@@ -264,22 +328,10 @@
             return;
         }
 
-        const keyword = (searchInput.value || "").trim().toLowerCase();
+        const keyword = normalizeSearchText(searchInput.value);
         const rows = tableBody.querySelectorAll("tr[data-update-url]");
         rows.forEach(function (row) {
-            const haystack = [
-                row.dataset.soDen,
-                row.dataset.ngayNhan,
-                row.dataset.ngayKy,
-                row.dataset.soKyHieu,
-                row.dataset.trichYeu,
-                row.dataset.coQuan,
-                row.dataset.trangThai,
-                row.dataset.loaiVb,
-                row.dataset.mucDo,
-            ]
-                .join(" ")
-                .toLowerCase();
+            const haystack = buildRowSearchText(row);
             row.classList.toggle("hidden", keyword !== "" && !haystack.includes(keyword));
         });
     }
@@ -290,6 +342,7 @@
         }
 
         activeRow.dataset.trangThai = documentData.trang_thai_vb_den;
+        activeRow.dataset.daPhanCong = documentData.da_phan_cong ? "1" : "0";
         activeRow.dataset.ngayNhan = documentData.ngay_nhan;
         activeRow.dataset.ngayKy = documentData.ngay_ky;
         activeRow.dataset.soKyHieu = documentData.so_ky_hieu;
@@ -440,6 +493,7 @@
 
         const csrfToken = editForm.querySelector("[name=csrfmiddlewaretoken]").value;
         const formData = new FormData(editForm);
+        formData.set("trang_thai_vb_den", document.getElementById("m-trang-thai").value || "");
         if (attachmentDeleteIdsInput) {
             formData.set("tep_dinh_kem_xoa_ids", attachmentDeleteIdsInput.value || "");
         }
@@ -463,7 +517,7 @@
                 applyUpdatedRow(payload.document);
                 populateModalFromRow(activeRow);
                 setEditMode(false);
-                showNotification(payload.message || "Lưu thành công!");
+                showNotification(payload.message || "Da chinh sua van ban den thanh cong.");
             })
             .catch(function (payload) {
                 if (payload && payload.errors) {

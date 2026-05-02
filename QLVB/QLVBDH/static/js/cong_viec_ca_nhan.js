@@ -131,16 +131,16 @@
                     activeRow.dataset.trangThaiXuLy = payload.trang_thai_xl;
                     const badge = activeRow.querySelector(".status-badge");
                     if (badge) {
-                        badge.textContent = payload.trang_thai_xl;
+                        badge.textContent = payload.trang_thai_xl_hien_thi || payload.trang_thai_xl;
                     }
                     if (window.applyStatusThemes) {
                         window.applyStatusThemes();
                     }
-                    showNotification(payload.message || "Da cap nhat tien do.");
+                    showNotification(payload.message || "Đã cập nhật tiến độ.");
                     closeModal();
                 })
                 .catch(function (payload) {
-                    errorBox.textContent = (payload && payload.message) || "Khong the cap nhat tien do.";
+                    errorBox.textContent = (payload && payload.message) || "Không thể cập nhật tiến độ.";
                 });
         });
 
@@ -162,19 +162,20 @@
                         return payload;
                     })
                     .then(function (payload) {
+                        activeRow.remove();
                         activeRow.dataset.trangThaiXuLy = "Cho xu ly";
                         const badge = activeRow.querySelector(".status-badge");
                         if (badge) {
-                            badge.textContent = "Cho xu ly";
+                            badge.textContent = "Chờ xử lý";
                         }
                         if (window.applyStatusThemes) {
                             window.applyStatusThemes();
                         }
-                        showNotification(payload.message || "Da chuyen phan cong.");
+                        showNotification(payload.message || "Đã chuyển phân công.");
                         closeModal();
                     })
                     .catch(function (payload) {
-                        errorBox.textContent = (payload && payload.message) || "Khong the chuyen phan cong.";
+                        errorBox.textContent = (payload && payload.message) || "Không thể chuyển phân công.";
                     });
             });
         }
@@ -262,11 +263,11 @@
             formData.set("ma_loai_vb", maLoaiVb);
 
             if (!trichYeu) {
-                errorBox.textContent = "Vui long nhap trich yeu van ban.";
+                errorBox.textContent = "Vui lòng nhập trích yếu văn bản.";
                 return;
             }
             if (!maLoaiVb) {
-                errorBox.textContent = "Vui long chon loai van ban.";
+                errorBox.textContent = "Vui lòng chọn loại văn bản.";
                 return;
             }
             if (!file) {
@@ -285,12 +286,12 @@
                     return payload;
                 })
                 .then(function (payload) {
-                    showNotification(payload.message || "Da cap nhat van ban.");
+                    showNotification(payload.message || "Đã câ nhật văn bản.");
                     activeRow.remove();
                     closeReturnedModal();
                 })
                 .catch(function (payload) {
-                    errorBox.textContent = (payload && payload.message) || "Khong the hoan thanh chinh sua.";
+                    errorBox.textContent = (payload && payload.message) || "Không thể hoàn thành chỉnh sửa.";
                 });
         }, 0);
     });
